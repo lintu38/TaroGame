@@ -25,10 +25,10 @@
     font-family:'Zen Kaku Gothic New','Hiragino Sans',system-ui,sans-serif;
     overscroll-behavior:none; }
   body{ display:flex; flex-direction:column; align-items:center;
-    padding:12px 12px calc(14px + env(safe-area-inset-bottom)); min-height:100dvh; }
+    padding:8px 12px calc(14px + env(safe-area-inset-bottom)); min-height:100dvh; }
 
-  .head{ text-align:center; margin:2px 0 10px; }
-  .head h1{ margin:0; font-size:19px; font-weight:700; letter-spacing:.06em; }
+  .head{ text-align:center; margin:0 0 6px; }
+  .head h1{ margin:0; font-size:18px; font-weight:700; letter-spacing:.06em; }
   .head h1 .t-paw{ display:inline-block; line-height:0; margin:0 7px; vertical-align:-3px; }
   .head h1 .t-paw svg{ width:23px; height:20px; display:block; fill:#C7AC87; opacity:.9; }
   .head p{ margin:3px 0 0; font-size:11.5px; color:var(--text-muted); }
@@ -51,9 +51,9 @@
     .foot .hint{ font-size:14.5px; }
   }
 
-  .bar{ display:flex; align-items:stretch; gap:8px; margin-bottom:8px; }
+  .bar{ display:flex; align-items:stretch; gap:7px; margin-bottom:7px; }
   .pill{ flex:1; background:var(--bg-card); border:1px solid var(--line);
-    border-radius:13px; padding:7px 11px; display:flex; align-items:baseline; gap:7px; }
+    border-radius:13px; padding:6px 11px; display:flex; align-items:baseline; gap:7px; }
   .pill .lab{ font-family:'Space Mono',monospace; font-size:9px; letter-spacing:.14em;
     color:var(--beige-deep); }
   .pill .val{ font-family:'Space Mono',monospace; font-size:17px; font-weight:700;
@@ -154,6 +154,8 @@
     50%{ box-shadow:0 12px 26px -12px var(--beige-deep), 0 0 30px 10px rgba(201,168,124,.34);
       transform:scale(1.05); } }
 
+  /* なまえの 板は 画面ぜんたいに（スマホでも まんなかに 出る） */
+  .namebox{ position:fixed; z-index:60; }
   .over{ position:absolute; inset:0; display:none; place-items:center;
     background:rgba(251,247,240,.86); backdrop-filter:blur(2px); }
   .over.on{ display:grid; }
@@ -174,9 +176,9 @@
   .btn.ghost{ background:var(--bg-card); color:var(--text-muted);
     border:1px solid var(--line); box-shadow:none; }
 
-  .foot{ display:flex; align-items:center; gap:8px; margin-top:9px; flex-wrap:wrap; }
-  .foot .hint{ flex:1 1 200px; font-size:13.5px; font-weight:500; color:var(--text-muted);
-    line-height:1.7; }
+  .foot{ display:flex; align-items:center; gap:7px; margin-top:7px; flex-wrap:wrap; }
+  .foot .hint{ flex:1 1 190px; margin:0; font-size:12.5px; font-weight:500;
+    color:var(--text-muted); line-height:1.55; }
 
   /* むずかしさ */
   .lv{ display:flex; background:var(--bg-card); border:1px solid var(--line);
@@ -189,7 +191,10 @@
   /* あそびかた（3分バトル / ∞）は 目立たせる */
   .lv.mode{ border-color:var(--beige); box-shadow:0 6px 16px -12px var(--beige-deep); }
   .lv.mode button{ font-size:13px; font-weight:700; padding:8px 16px; }
-  .lv.mode button.on{ box-shadow:0 4px 10px -6px var(--beige-deep); }
+  .lv.mode button.on{ box-shadow:0 4px 10px -6px rgba(120,100,80,.5); }
+  /* 3分バトルは くすみオレンジ、∞ は くすみシアン */
+  #tm button:first-child.on{ background:linear-gradient(135deg,#E3A56C,#C87F45); }
+  #tm button:last-child.on{ background:linear-gradient(135deg,#8CC0C4,#5E9BA4); }
   #lv.hide{ display:none; }
 
   /* きろく と 進化の輪 */
@@ -230,8 +235,8 @@
   .nbtn .btn{ padding:8px 16px; }
 
   /* 大きさの一覧 */
-  .chain{ margin-top:11px; background:var(--bg-card); border:1px solid var(--line);
-    border-radius:14px; padding:9px 10px; }
+  .chain{ margin-top:8px; background:var(--bg-card); border:1px solid var(--line);
+    border-radius:14px; padding:8px 10px; }
   .chain .t{ font-size:11px; font-weight:700; letter-spacing:.12em;
     color:var(--beige-deep); margin:0 0 6px 2px;
     display:flex; align-items:center; gap:7px; }
@@ -289,18 +294,6 @@
       </div>
     </div>
     <div class="bonus" id="bonus"><b>BONUS</b><i id="bonusN">+0</i></div>
-    <div class="over" id="nameBox">
-      <div class="box">
-        <h2 id="nameTitle">プレイヤー</h2>
-        <p>3分バトルの きろくは、なまえごとに のこります</p>
-        <div class="whos" id="whoList"></div>
-        <input id="nameIn" maxlength="8" placeholder="あたらしい なまえ" autocomplete="off">
-        <div class="nbtn">
-          <button class="btn" id="nameOk">ふやす</button>
-          <button class="btn ghost" id="nameClose">とじる</button>
-        </div>
-      </div>
-    </div>
     <div class="over" id="over">
       <div class="box">
         <div class="ovic" id="ovIc"></div>
@@ -326,10 +319,14 @@
       <button type="button">ふつう</button>
       <button type="button">むずかしい</button>
     </div>
-    <button class="btn ghost" id="reset">やりなおす</button>
+    <button class="btn ghost" id="reset">RESET</button>
   </div>
 
   <div class="side">
+  <div class="chain rec">
+    <p class="t"><span>3分バトル</span><span class="wlab">現在のプレーヤー</span><button type="button" class="mini who" id="whoBtn" title="プレイヤーを えらぶ・ふやす">なまえ</button></p>
+    <ol class="rank" id="rankList"></ol>
+  </div>
   <div class="chain">
     <p class="t">進化の輪</p>
     <div class="wheel" id="chainRow"><div class="ring"></div></div>
@@ -338,12 +335,21 @@
       虹色どうしなら 点数5倍<br>
       クリアすると 点数7倍</p>
   </div>
-  <div class="chain rec">
-    <p class="t"><span>3分バトル</span><span class="wlab">現在のプレーヤー</span><button type="button" class="mini who" id="whoBtn" title="プレイヤーを えらぶ・ふやす">なまえ</button></p>
-    <ol class="rank" id="rankList"></ol>
-  </div>
   </div>
 </div>
+
+<div class="over namebox" id="nameBox">
+      <div class="box">
+        <h2 id="nameTitle">プレイヤー</h2>
+        <p>3分バトルの きろくは、なまえごとに のこります</p>
+        <div class="whos" id="whoList"></div>
+        <input id="nameIn" maxlength="8" placeholder="あたらしい なまえ" autocomplete="off">
+        <div class="nbtn">
+          <button class="btn" id="nameOk">ふやす</button>
+          <button class="btn ghost" id="nameClose">とじる</button>
+        </div>
+      </div>
+    </div>
 
 <script>
 (function(){
@@ -567,7 +573,7 @@ function curLv(){ return LIMIT === 180000 ? BATTLE_LV : lv; }
 /* もち時間も えらべる。0 は タイムレス（時間で おわらない） */
 const TIMES = [180000, 0];
 const DAY = 600000;                    /* タイムレスの とき、空が ひとめぐりする ながさ */
-let lv = 0, tm = 0;
+let lv = 0, tm = 1;          /* はじめは ∞ */
 let LIMIT = TIMES[tm] || Infinity;
 let tUsed = 0;                   /* 遊んだ ながさ。空のいろも これで かわる */
 let aimX = W / 2, holdT = 0, dropAt = 0;
@@ -1177,8 +1183,8 @@ function moonSvgArt(){
   return head
     + '<defs><clipPath id="mnLit"><path d="' + d + '"/></clipPath></defs>'
     + '<circle cx="13" cy="13" r="11" fill="#E8DEB0" opacity=".22"/>'
-    + '<path d="' + d + '" fill="#F6DB63"/>'
-    + '<g clip-path="url(#mnLit)" fill="#E7C63F" opacity=".38">'
+    + '<path d="' + d + '" fill="#FBEBA4"/>'
+    + '<g clip-path="url(#mnLit)" fill="#EBD887" opacity=".34">'
     + '<circle cx="10.3" cy="9.4" r="1.7"/><circle cx="15.2" cy="15.8" r="2.1"/>'
     + '<circle cx="9.4" cy="16.2" r="1.05"/><circle cx="16.6" cy="8.8" r=".8"/></g></svg>';
 }
@@ -1264,7 +1270,7 @@ function spawnSky(now, ph){
   const sz = kind === 'owl' ? 1 : kind === 'crow' ? 1.12 : 1;
   const o = { kind: kind, sz: sz, face: dir,
               x: dir > 0 ? -28 : W + 28,
-              y: 26 + Math.random() * (LINE_Y - 56),
+              y: 15 + Math.random() * 30,      /* 上のほうを 飛ぶ */
               v: dir * (kind === 'ufo' ? 0.28 : kind === 'hero' ? 0.92
                         : kind === 'owl' ? 0.42 : 0.52 + Math.random() * 0.36),
               ph: Math.random() * 6.2832, bob: 0.6 + Math.random() * 0.9,
@@ -1382,8 +1388,10 @@ function skyTick(dt, now, ph){
     }
   }
   if(now > skyNext){
-    skyNext = now + 2400 + Math.random() * 5400;
-    if(SKYL.length < 3) spawnSky(now, ph);
+    skyNext = now + 3200 + Math.random() * 6000;
+    /* 鳥・カラス・フクロウは いちどに 一羽だけ */
+    const alone = !SKYL.some(o => o.kind !== 'ufo' && o.kind !== 'hero');
+    if(alone) spawnSky(now, ph);
   }
   for(let i = SKYL.length - 1; i >= 0; i--){
     const o = SKYL[i];
@@ -1993,7 +2001,8 @@ function fit(){
   /* よこに ならんでいる ときだけ、下の ぶんを 引く。
      たての ときは 画面の はばいっぱいに 広げて、下は スクロールで */
   const below = side ? (foot ? foot.offsetHeight : 0) + 34 : 18;
-  const avail = Math.max(240, (side ? winH - top - below : winH * 0.94 - top));
+  /* たてに ならぶ ときは、下の «3分バトル» の なまえが 見えるぶんを のこす */
+  const avail = Math.max(240, side ? winH - top - below : winH - top - 152);
   const maxW = stage.clientWidth || 360;
   /* せまい画面でも、小さくしすぎない。足りないぶんは すこし スクロール */
   const minW = Math.min(maxW, 300);
