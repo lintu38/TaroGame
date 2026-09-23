@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#FBF7F0">
 <title>TARO GAME</title>
+<link rel="icon" id="favIcon" href="data:,">
+<link rel="apple-touch-icon" id="favTouch" href="data:,">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="TARO GAME">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
@@ -2132,6 +2137,30 @@ function loop(now){
   draw(now);
   requestAnimationFrame(loop);
 }
+
+/* タブや ホーム画面の アイコンは、中くらいの ベージュの 犬ボール */
+(function paintIcon(){
+  const img = new Image();
+  img.onload = function(){
+    try{
+      const N = 180, c = document.createElement('canvas');
+      c.width = c.height = N;
+      const x = c.getContext('2d');
+      x.fillStyle = '#FBF7F0';
+      x.fillRect(0, 0, N, N);
+      const sc = N * 0.86 / (SVG_R * 2);          /* 顔が ほぼ いっぱいに */
+      x.drawImage(img, N / 2 - SVG_CX * sc, N / 2 - SVG_CY * sc + 3,
+                  SVG_W * sc, SVG_H * sc);
+      const url = c.toDataURL('image/png');
+      const a = document.getElementById('favIcon');
+      const b = document.getElementById('favTouch');
+      if(a) a.href = url;
+      if(b) b.href = url;
+    }catch(e){}
+  };
+  img.src = 'data:image/svg+xml;charset=utf-8,'
+    + encodeURIComponent(dogSVG(COATS[TOP_COAT], BOW[0], 0));
+})();
 
 loadBest();
 paintSnd();
