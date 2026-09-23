@@ -33,7 +33,7 @@
   .head h1 .t-paw svg{ width:23px; height:20px; display:block; fill:#C7AC87; opacity:.9; }
   .head p{ margin:3px 0 0; font-size:11.5px; color:var(--text-muted); }
 
-  .wrap{ width:100%; max-width:420px; }
+  .wrap{ width:100%; max-width:min(520px, 100%); }
 
   /* 画面の広い パソコンでは、SIZES を よこに置いて
      そのぶん 遊ぶ板を 大きく する */
@@ -76,7 +76,7 @@
   .snd.off svg .cut{ display:block; }
   .snd:active{ transform:scale(.95); }
 
-  .stage{ position:relative; width:100%; background:var(--bg-card);
+  .stage{ position:relative; width:100%; margin:0 auto; background:var(--bg-card);
     border:1px solid var(--line); border-radius:18px; overflow:hidden;
     box-shadow:0 12px 30px -24px var(--beige-deep); touch-action:none; }
   canvas{ display:block; width:100%; height:auto; }
@@ -1989,9 +1989,11 @@ function fit(){
   const sr = stage.getBoundingClientRect();
   const cr = chain ? chain.getBoundingClientRect() : null;
   const side = !!(cr && cr.left >= sr.right - 2);
-  const below = (foot ? foot.offsetHeight : 0)
-              + (chain && !side ? chain.offsetHeight : 0) + 34;
-  const avail = Math.max(240, (window.innerHeight || 640) - top - below);
+  const winH = window.innerHeight || 640;
+  /* よこに ならんでいる ときだけ、下の ぶんを 引く。
+     たての ときは 画面の はばいっぱいに 広げて、下は スクロールで */
+  const below = side ? (foot ? foot.offsetHeight : 0) + 34 : 18;
+  const avail = Math.max(240, (side ? winH - top - below : winH * 0.94 - top));
   const maxW = stage.clientWidth || 360;
   /* せまい画面でも、小さくしすぎない。足りないぶんは すこし スクロール */
   const minW = Math.min(maxW, 300);
