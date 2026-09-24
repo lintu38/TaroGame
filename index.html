@@ -176,7 +176,7 @@
     cursor:pointer; background:#FAF2E4; border:2px solid #E2CFAE; box-shadow:none;
     display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
     animation:stGlow 2.1s ease-in-out infinite; }
-  .startBtn .ico{ display:block; line-height:0; width:38%; }
+  .startBtn .ico{ display:block; line-height:0; width:20%; max-width:32px; }
   .startBtn .ico svg{ width:100%; height:auto; display:block; }
   .startBtn b{ font-family:'Comfortaa','Zen Kaku Gothic New',cursive; font-weight:700;
     font-size:22px; letter-spacing:.1em; color:#8A6437; padding-left:.1em; }
@@ -1148,6 +1148,7 @@ function toIdle(){
   if(cntT){ clearTimeout(cntT); cntT = 0; }
   reset();
   idle = true;
+  rolls.length = 0; rollNext = 0;        /* 転がる子は 仕切りなおし */
   paused = true;
   showCount('');
   showCong(false);
@@ -1524,7 +1525,7 @@ function skyTick(dt, now, ph){
                 st: 'pass', t0: now, blink: 0 });
   }
   if(!ufoNext) ufoNext = now + 12000 + Math.random() * 9000;
-  else if(now > ufoNext && !over){
+  else if(now > ufoNext && !over && !idle){   /* START の 画面では 来ない */
     const L = LEVELS[curLv()];
     ufoNext = now + L.gap + Math.random() * L.gapR;
     spawnUfo(now);
@@ -1818,6 +1819,144 @@ function runTick(dt, now){
     if(runner.x < -40 || runner.x > W + 40) runner = null;
   }
 }
+/* ---- おくってもらった «フードの子» の 絵 ---- */
+const RO_LINE = '#7A4D24', RO_EYE = '#332211', RO_FACE = '#FFFFFF';
+const RO_KIND = [
+  { hood:'#FFE066', paw:'#F3E2B0', blush:'#F2D9A8' },   /* きいろ（王さま） */
+  { hood:'#CE6A19', paw:'#EED2B3', blush:'#EED2B3' },   /* オレンジ */
+  { hood:'#DB7F30', paw:'#EED2B3', blush:'#EED2B3' },   /* うすい オレンジ */
+  { hood:'#B5651B', paw:'#EED2B3', blush:'#EED2B3' }    /* こげ オレンジ */
+];
+function rollSvg(i){
+  const c = RO_KIND[i] || RO_KIND[1];
+  const L = RO_LINE, sw = 4.2;
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"'
+    + ' width="300" height="300">'
+    /* みみ */
+    + '<circle cx="21" cy="22" r="13.5" fill="' + c.hood + '" stroke="' + L
+    +   '" stroke-width="' + sw + '"/>'
+    + '<circle cx="79" cy="22" r="13.5" fill="' + c.hood + '" stroke="' + L
+    +   '" stroke-width="' + sw + '"/>'
+    /* からだ（フード） */
+    + '<circle cx="50" cy="52" r="45" fill="' + c.hood + '" stroke="' + L
+    +   '" stroke-width="' + sw + '"/>'
+    /* しろい おかお */
+    + '<circle cx="50" cy="56" r="34" fill="' + RO_FACE + '"/>'
+    /* ほっぺ */
+    + '<ellipse cx="33" cy="36" rx="6.2" ry="4.8" fill="' + c.blush + '"/>'
+    + '<ellipse cx="67" cy="36" rx="6.2" ry="4.8" fill="' + c.blush + '"/>'
+    /* おめめ */
+    + '<ellipse cx="37" cy="55" rx="4.8" ry="5.4" fill="' + RO_EYE + '"/>'
+    + '<ellipse cx="63" cy="55" rx="4.8" ry="5.4" fill="' + RO_EYE + '"/>'
+    /* おくち */
+    + '<ellipse cx="50" cy="66" rx="14.5" ry="11" fill="' + RO_FACE + '" stroke="' + L
+    +   '" stroke-width="2"/>'
+    + '<ellipse cx="50" cy="60.5" rx="5.4" ry="4.1" fill="' + RO_EYE + '"/>'
+    + '<path d="M43.4 67.6q3.3 5 6.6 0q3.3 5 6.6 0" fill="none" stroke="' + RO_EYE
+    +   '" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/>'
+    /* おてて */
+    + '<ellipse cx="26" cy="86" rx="12" ry="9" fill="' + c.paw + '" stroke="' + L
+    +   '" stroke-width="3.4"/>'
+    + '<ellipse cx="74" cy="86" rx="12" ry="9" fill="' + c.paw + '" stroke="' + L
+    +   '" stroke-width="3.4"/>'
+    + '</svg>';
+}
+/* ---- 赤い線の うえを ころころ ころがる子たち ---- */
+let rolls = [], rollNext = 0;
+function rollTick(dt, now){
+  /* 転がる子は START の 画面だけ（3・2・1 が はじまったら 消える） */
+  if(!idle || cntT){
+    if(rolls.length) rolls.length = 0;
+    rollNext = 0;
+    return;
+  }
+  const k = Math.min(3, dt / 16.6667);
+  if(!rollNext){ rollNext = now + 1200 + Math.random() * 2200; return; }
+  if(!rolls.length && now > rollNext){
+    const dir = Math.random() < 0.5 ? 1 : -1;
+    const king = Math.random() < 0.34;          /* たまに 王さまが 先頭で */
+    const n = 1 + Math.floor(Math.random() * 3);
+    const v = dir * (0.75 + Math.random() * 0.75);
+    let gap = 14;
+    for(let i = 0; i < n + (king ? 1 : 0); i++){
+      const kg = king && i === 0;
+      const r = kg ? 30 + Math.random() * 9 : 11 + Math.random() * 11;
+      gap += r;
+      rolls.push({ r: r, ci: kg ? 0 : 1 + Math.floor(Math.random() * 3),
+                   x: dir > 0 ? -gap : W + gap, y: 0,
+                   v: v * (1 - i * 0.02), rot: Math.random() * 6.2832, crown: kg });
+      gap += r + 5;
+    }
+    rollNext = now + 8000 + Math.random() * 8000;
+  }
+  for(let i = rolls.length - 1; i >= 0; i--){
+    const o = rolls[i];
+    o.x += o.v * k;
+    o.rot += (o.v * k) / o.r;                    /* ころがる むき */
+    o.y = LINE_Y - o.r + 0.8;
+    /* 出ていった むこう側で だけ 消す */
+    if(o.v > 0 ? o.x > W + o.r + 40 : o.x < -o.r - 40) rolls.splice(i, 1);
+  }
+}
+function drawCrown(r){                     /* 王冠は あたまの 真ん中に */
+  const w = r * 0.92, h = r * 0.5;
+  ctx.save();
+  ctx.translate(0, -r * 1.0);
+  const g = ctx.createLinearGradient(0, -h, 0, h * 0.2);
+  g.addColorStop(0, '#F7CE7E'); g.addColorStop(0.55, '#F0A45F'); g.addColorStop(1, '#EE8F63');
+  ctx.beginPath();
+  ctx.moveTo(-w / 2, h * 0.18);
+  ctx.lineTo(-w / 2, -h * 0.60);          /* ひだりの つの */
+  ctx.lineTo(-w / 4, -h * 0.18);
+  ctx.lineTo(-w / 4, -h * 0.86);          /* うちがわの つの */
+  ctx.lineTo(0, -h * 0.26);
+  ctx.lineTo(0, -h);                      /* まんなかの つの */
+  ctx.lineTo(w / 4, -h * 0.26);
+  ctx.lineTo(w / 4, -h * 0.86);
+  ctx.lineTo(w / 2, -h * 0.18);
+  ctx.lineTo(w / 2, -h * 0.60);
+  ctx.lineTo(w / 2, h * 0.18);
+  ctx.closePath();
+  ctx.fillStyle = g; ctx.fill();
+  /* つのの さきの たま */
+  const bs = r * 0.082;
+  const tips = [[-w / 2, -h * 0.60], [-w / 4, -h * 0.86], [0, -h],
+                [w / 4, -h * 0.86], [w / 2, -h * 0.60]];
+  ctx.fillStyle = '#EFBE63';
+  for(let i = 0; i < tips.length; i++){
+    ctx.beginPath(); ctx.arc(tips[i][0], tips[i][1], bs, 0, 6.2832); ctx.fill();
+  }
+  /* かざりの たま */
+  const jw = [[0, -h * 0.22, '#2E8BE8', bs * 1.15], [-w * 0.26, -h * 0.20, '#EE3D6B', bs * 0.82],
+              [w * 0.26, -h * 0.20, '#EE3D6B', bs * 0.82],
+              [-w * 0.48, -h * 0.18, '#2E8BE8', bs * 0.7],
+              [w * 0.48, -h * 0.18, '#2E8BE8', bs * 0.7]];
+  for(let i = 0; i < jw.length; i++){
+    ctx.fillStyle = jw[i][2];
+    ctx.beginPath(); ctx.arc(jw[i][0], jw[i][1], jw[i][3], 0, 6.2832); ctx.fill();
+  }
+  ctx.restore();
+}
+function drawRolls(now){
+  for(let i = 0; i < rolls.length; i++){
+    const o = rolls[i];
+    const img = skyArt('ro' + o.ci, rollSvg(o.ci));
+    if(img){
+      ctx.save();
+      ctx.translate(o.x, o.y);
+      ctx.rotate(o.rot || 0);
+      ctx.drawImage(img, -o.r * 1.06, -o.r * 1.06, o.r * 2.12, o.r * 2.12);
+      ctx.restore();
+    }
+    if(o.crown){
+      ctx.save();
+      ctx.translate(o.x, o.y);
+      ctx.rotate(o.rot || 0);        /* 王冠も いっしょに まわる */
+      drawCrown(o.r);
+      ctx.restore();
+    }
+  }
+}
 function drawRunner(now){
   if(!runner) return;
   /* あしの ふりは なめらかに（5どきざみ）。ph 4つで ひとまわり */
@@ -1887,6 +2026,7 @@ function draw(now){
   /* 空の子たち（線に とまる子は 線のうえに） */
   for(let i = 0; i < SKYL.length; i++) drawSkyOne(SKYL[i], now);
   drawRunner(now);
+  drawRolls(now);
 
   /* 待っている子と、ねらいの すじ */
   if(!over && !idle && cur){
@@ -2478,6 +2618,8 @@ function fit(){
     const d = Math.max(118, Math.min(186, wpx * 0.46));
     sb.style.width = sb.style.height = d.toFixed(0) + 'px';
     sb.querySelector('b').style.fontSize = (d * 0.168).toFixed(1) + 'px';
+    const ic = sb.querySelector('.ico');      /* 犬ボールは いつも 小さく */
+    if(ic) ic.style.width = Math.round(Math.min(32, d * 0.20)) + 'px';
   }
   const cn = document.getElementById('count');
   if(cn){
@@ -2614,6 +2756,7 @@ function loop(now){
   if(flying) flyStep(dt);
   skyTick(dt, now, phaseOf(dayF()));
   runTick(dt, now);
+  rollTick(dt, now);
   if(!over && !paused && !flying){
     keyAim(dt);
     if(!window.__noTime) tUsed += dt;      /* 見なおし用に 時計を 止められる */
@@ -2740,6 +2883,8 @@ window.__GAME = {
   reset: reset,
   idle: () => idle,
   runner: () => runner && { x: +runner.x.toFixed(1), dir: runner.dir, g: runner.gait },
+  rolls: () => rolls.map(o => ({ x: +o.x.toFixed(1), r: +o.r.toFixed(1), k: !!o.crown })),
+  roll: (n) => { rolls.length = 0; rollNext = 1; rollTick(16, 1e9); return rolls.length; },
   pest: () => dropPest(performance.now()),
   iconSvg: () => dogSVG(COATS[TOP_COAT], BOW[0], 0),
   start: () => beginGame(),
