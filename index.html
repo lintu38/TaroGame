@@ -1802,11 +1802,10 @@ function runTick(dt, now){
     if(!runNext) runNext = now + 1800 + Math.random() * 3000;
     else if(!runner && now > runNext){
       const dir = Math.random() < 0.5 ? 1 : -1;
-      /* 歩き・走り・駆け足 */
-      const g = Math.random();
-      const gait = g < 0.4 ? 0 : g < 0.78 ? 1 : 2;
-      const V  = [0.55, 1.45, 2.7][gait];
-      const FP = [0.155, 0.30, 0.44][gait];
+      /* 歩きと 走りの ふたつ（駆け足は なし） */
+      const gait = Math.random() < 0.45 ? 0 : 1;
+      const V  = [0.55, 1.45][gait];
+      const FP = [0.155, 0.30][gait];
       runner = { x: dir > 0 ? -26 : W + 26, dir: dir, gait: gait,
                  v: dir * (V * (0.9 + Math.random() * 0.2)), fp: FP, ph: 0 };
       runNext = now + 6000 + Math.random() * 8000;
@@ -1967,10 +1966,9 @@ function drawRunner(now){
   if(!img) return;
   const h = 30, w = 34;                  /* 絵の 大きさ（そのまま） */
   ctx.save();
-  const bob = [0.5, 0.9, 1.7][runner.gait || 0];
+  const bob = [0.5, 0.9][runner.gait || 0];
   /* はずみは あしに あわせて（ひと足で ひとつ） */
   ctx.translate(runner.x, LINE_Y - h + 4.6 + Math.sin(runner.ph * Math.PI) * bob);
-  if(runner.gait === 2) ctx.rotate(sw * 0.045);   /* 駆け足は すこし 前傾 */
   if(runner.dir < 0){ ctx.translate(w / 2, 0); ctx.scale(-1, 1); ctx.translate(-w / 2, 0); }
   ctx.drawImage(img, -w / 2, 0, w, h);
   ctx.restore();
