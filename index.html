@@ -30,6 +30,10 @@
     overscroll-behavior:none; }
   body{ display:flex; flex-direction:column; align-items:center;
     padding:8px 12px calc(14px + env(safe-area-inset-bottom)); min-height:100dvh; }
+  /* スマホでは 板を すこし 広く */
+  @media (max-width:700px){
+    body{ padding-left:5px; padding-right:5px; }
+  }
 
   .head{ text-align:center; margin:0 0 6px; }
   .head h1{ margin:0; font-size:19px; font-weight:700; letter-spacing:.04em;
@@ -299,6 +303,16 @@
   .cols button{ width:25px; height:25px; border-radius:50%; padding:0; cursor:pointer;
     border:2px solid transparent; outline:2px solid transparent; outline-offset:2px; }
   .cols button.on{ outline-color:var(--beige-deep); }
+  /* なまえを かえる・けす */
+  .erow{ display:flex; gap:7px; justify-content:center; margin:0 0 9px; }
+  .ebtn{ font-family:inherit; font-size:11.5px; cursor:pointer; color:var(--text-muted);
+    background:var(--bg-soft); border:1px solid var(--line); border-radius:99px;
+    padding:5px 12px; }
+  .ebtn.on{ color:#fff; background:var(--beige); border-color:transparent; }
+  .ebtn.del{ color:#B4685F; }
+  .ebtn.del.arm{ color:#fff; background:#C2685E; border-color:transparent; }
+  #nameBox .nmsg{ min-height:14px; font-size:11px; color:var(--beige-deep);
+    margin:-2px 0 7px; }
   .nbtn{ display:flex; gap:7px; justify-content:center; }
   .nbtn .btn{ padding:8px 16px; }
 
@@ -423,7 +437,12 @@
         <div class="whos" id="whoList"></div>
         <p class="clab" id="colLab">いろ</p>
         <div class="cols" id="colList"></div>
+        <div class="erow">
+          <button type="button" class="ebtn" id="nameEdit">なまえを かえる</button>
+          <button type="button" class="ebtn del" id="nameDel">けす</button>
+        </div>
         <input id="nameIn" maxlength="8" placeholder="あたらしい なまえ" autocomplete="off">
+        <p class="nmsg" id="nameMsg"></p>
         <div class="nbtn">
           <button class="btn" id="nameOk">ふやす</button>
           <button class="btn ghost" id="nameClose">とじる</button>
@@ -1726,15 +1745,16 @@ function drawSkyOne(o, now){
 
 
 /* One Step の 犬（よこ向き）。START の 画面で、赤い線の うえを かけぬける */
-function runnerSvg(k){
-  /* k: 0..2 の あしの かたち */
-  const A = [-20, 0, 20][k], B = [20, 0, -20][k];
+function runnerSvg(a){
+  /* a: あしの ふりの 角度（-20〜20 ど） */
+  const A = a, B = -a;
   const body = '#C9A87C', dark = '#A6845C', light = '#EBDCC4', nose = '#5C4632';
   const la = 'transform="rotate(' + A + ' 12.5 20)"';
   const lb = 'transform="rotate(' + B + ' 12.5 20)"';
   const lf = 'transform="rotate(' + A + ' 21.5 20)"';
   const lg = 'transform="rotate(' + B + ' 21.5 20)"';
-  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 34 30" width="34" height="30">'
+  /* 画のこまかさは 3ばい（スマホの こうかいぞうどでも くっきり） */
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 34 30" width="102" height="90">'
     + '<defs><clipPath id="rHead"><circle cx="26" cy="12.5" r="5.4"/></clipPath>'
     + '<clipPath id="rNeck"><rect x="6.5" y="12" width="18" height="9" rx="4.5"/></clipPath></defs>'
     + '<path fill="' + body + '" d="M7.5 14.6C4.45 12.75, 3.15 9.2, 6.0 7.1C8.3 5.5, 11.2 6.7,'
@@ -1768,9 +1788,16 @@ function runnerSvg(k){
     + '</svg>';
 }
 /* かけぬける 犬 */
-let runner = null, runNext = 0;
+const RUNA = [-20, -15, -10, -5, 0, 5, 10, 15, 20];   /* あしの 角度 9まい */
+let runner = null, runNext = 0, runWarm = false;
+function warmRunner(){                 /* 出るまえに ぜんぶ よみこんでおく */
+  if(runWarm) return;
+  runWarm = true;
+  RUNA.forEach(function(a){ skyArt('run' + a, runnerSvg(a)); });
+}
 function runTick(dt, now){
   if(idle){
+    warmRunner();
     if(!runNext) runNext = now + 1800 + Math.random() * 3000;
     else if(!runner && now > runNext){
       const dir = Math.random() < 0.5 ? 1 : -1;
@@ -1793,14 +1820,18 @@ function runTick(dt, now){
 }
 function drawRunner(now){
   if(!runner) return;
-  const f = Math.floor(runner.ph) % 4;
-  const img = skyArt('run' + f, runnerSvg(f === 3 ? 1 : f));
+  /* あしの ふりは なめらかに（5どきざみ）。ph 4つで ひとまわり */
+  const sw = Math.sin(runner.ph * Math.PI / 2);
+  const a = Math.round(sw * 4) * 5;
+  let img = skyArt('run' + a, runnerSvg(a));
+  if(img) runner.img = img; else img = runner.img;   /* まだなら まえの絵で */
   if(!img) return;
   const h = 30, w = 34;                  /* 絵の 大きさ（そのまま） */
   ctx.save();
   const bob = [0.5, 0.9, 1.7][runner.gait || 0];
-  ctx.translate(runner.x, LINE_Y - h + 4.6 + Math.sin(runner.ph * 1.6) * bob);
-  if(runner.gait === 2) ctx.rotate(Math.sin(runner.ph * 1.6) * 0.045);   /* 駆け足は すこし 前傾 */
+  /* はずみは あしに あわせて（ひと足で ひとつ） */
+  ctx.translate(runner.x, LINE_Y - h + 4.6 + Math.sin(runner.ph * Math.PI) * bob);
+  if(runner.gait === 2) ctx.rotate(sw * 0.045);   /* 駆け足は すこし 前傾 */
   if(runner.dir < 0){ ctx.translate(w / 2, 0); ctx.scale(-1, 1); ctx.translate(-w / 2, 0); }
   ctx.drawImage(img, -w / 2, 0, w, h);
   ctx.restore();
@@ -2100,7 +2131,8 @@ const COLS = [
   { n:'あお',      c:'#6B8FCE' },
   { n:'むらさき',  c:'#A583C8' }
 ];
-let recs = {}, cols = {}, who = '太郎';
+const DEF1 = 'タロウ', DEF2 = 'ハナコ';     /* さいしょの ふたり */
+let recs = {}, cols = {}, who = DEF1;
 function colOf(name){ return cols[name] || COLS[0].c; }
 function setCol(c){
   cols[who] = c;
@@ -2136,8 +2168,10 @@ function loadBest(){
   try{ soundOn = localStorage.getItem(SKEY) !== '0'; }catch(e){ soundOn = true; }
   try{ const raw = localStorage.getItem(RKEY); if(raw) recs = JSON.parse(raw) || {}; }catch(e){ recs = {}; }
   if(!recs || typeof recs !== 'object') recs = {};
-  if(recs['ゲスト'] && !recs['太郎']){ recs['太郎'] = recs['ゲスト']; delete recs['ゲスト']; }
-  /* むかしの きろくは «ゲスト» に ひきつぐ */
+  /* むかしの なまえは いまの なまえに ひきつぐ */
+  ['ゲスト', '太郎'].forEach(function(o){
+    if(recs[o] && !recs[DEF1]){ recs[DEF1] = recs[o]; delete recs[o]; }
+  });
   if(!Object.keys(recs).length){
     let old = [0, 0, 0];
     try{
@@ -2145,11 +2179,18 @@ function loadBest(){
       if(raw){ const a = JSON.parse(raw); if(Array.isArray(a)) old = [a[0]|0, a[1]|0, a[2]|0]; }
       else old = [0, parseInt(localStorage.getItem(KEY), 10) || 0, 0];
     }catch(e){}
-    if(old[0] || old[1] || old[2]) recs['太郎'] = old;
+    if(old[0] || old[1] || old[2]) recs[DEF1] = old;
   }
+  if(!Object.keys(recs).length){ recs[DEF1] = [0, 0, 0]; recs[DEF2] = [0, 0, 0]; }
   try{ const w = localStorage.getItem(WKEY); if(w) who = w; }catch(e){}
+  if(who === '太郎' || who === 'ゲスト') who = DEF1;
   try{ const raw = localStorage.getItem(CKEY); if(raw) cols = JSON.parse(raw) || {}; }catch(e){ cols = {}; }
   if(!cols || typeof cols !== 'object') cols = {};
+  ['ゲスト', '太郎'].forEach(function(o){
+    if(cols[o] && !cols[DEF1]){ cols[DEF1] = cols[o]; delete cols[o]; }
+  });
+  if(!cols[DEF1]) cols[DEF1] = COLS[5].c;            /* タロウは みずいろ */
+  if(recs[DEF2] && !cols[DEF2]) cols[DEF2] = COLS[1].c;   /* ハナコは ピンク */
   if(!recs[who]) recs[who] = [0, 0, 0];
   try{ const n = parseInt(localStorage.getItem(LKEY), 10); if(n >= 0 && n <= 2) lv = n; }catch(e){}
   try{ const n = parseInt(localStorage.getItem(TKEY), 10);
@@ -2291,6 +2332,60 @@ function paintCols(){                      /* いろの まるを ならべる *
     b.style.color = b.classList.contains('on') ? '#fff' : c;
   });
 }
+/* なまえを かえる／けす */
+let nmEdit = false, delArm = false;
+function nmMsg(t){
+  const m = document.getElementById('nameMsg');
+  if(m) m.textContent = t || '';
+}
+function disarm(){
+  const d = document.getElementById('nameDel');
+  if(d){ d.classList.remove('arm'); d.textContent = 'けす'; }
+  delArm = false;
+}
+function setEdit(on){
+  nmEdit = !!on;
+  const e = document.getElementById('nameEdit');
+  const inp = document.getElementById('nameIn');
+  const ok = document.getElementById('nameOk');
+  if(!e || !inp || !ok) return;
+  e.classList.toggle('on', nmEdit);
+  e.textContent = nmEdit ? 'やめる' : 'なまえを かえる';
+  ok.textContent = nmEdit ? 'かえる' : 'ふやす';
+  inp.value = nmEdit ? who : '';
+  nmMsg('');
+  if(nmEdit) setTimeout(function(){ inp.focus(); inp.select(); }, 40);
+}
+function renameWho(v){
+  v = String(v || '').trim().slice(0, 8);
+  if(!v){ nmMsg('なまえを いれてね'); return; }
+  if(v === who){ setEdit(false); return; }
+  if(recs[v]){ nmMsg('その なまえは もう あります'); return; }
+  const old = who;
+  recs[v] = recs[old] || [0, 0, 0];
+  delete recs[old];
+  cols[v] = colOf(old);
+  delete cols[old];
+  who = v;
+  try{ localStorage.setItem(WKEY, who);
+       localStorage.setItem(CKEY, JSON.stringify(cols)); }catch(e){}
+  saveRecs();
+  best = bestOf(who); paintHud(); paintRank();
+  openName(false);
+  nmMsg(old + ' → ' + who);
+}
+function delWho(){
+  const gone = who;
+  delete recs[gone];
+  delete cols[gone];
+  try{ localStorage.setItem(CKEY, JSON.stringify(cols)); }catch(e){}
+  saveRecs();
+  const left = Object.keys(recs);
+  who = '';
+  setWho(left.length ? left[0] : DEF1);
+  openName(false);
+  nmMsg(gone + ' を けしました');
+}
 function openName(add){
   const box = document.getElementById('nameBox');
   const inp = document.getElementById('nameIn');
@@ -2306,9 +2401,10 @@ function openName(add){
     b.addEventListener('click', () => {
       setWho(b.getAttribute('data-n'));
       [].forEach.call(list.children, x => x.classList.toggle('on', x === b));
-      paintCols();
+      paintCols(); disarm(); setEdit(false);
     }));
   paintCols();
+  disarm(); setEdit(false);
   paused = true;
   box.classList.add('on');
   if(add) setTimeout(() => inp.focus(), 40);
@@ -2466,7 +2562,7 @@ document.getElementById('again').addEventListener('click', () => {
 });
 document.getElementById('reset').addEventListener('click', () => {
   if(idle) return;
-  reset();
+  toIdle();                    /* START の 画面に もどる */
 });
 document.getElementById('quit').addEventListener('click', toIdle);
 document.getElementById('startBtn').addEventListener('click', beginGame);
@@ -2477,12 +2573,28 @@ document.getElementById('startBtn').addEventListener('click', beginGame);
 document.getElementById('whoBtn').addEventListener('click', () => openName(false));
 document.getElementById('nameOk').addEventListener('click', () => {
   const v = document.getElementById('nameIn').value.trim();
+  if(nmEdit){ renameWho(v); return; }
   if(v) setWho(v);
   closeName();
 });
+document.getElementById('nameEdit').addEventListener('click', () => {
+  disarm(); setEdit(!nmEdit);
+});
+document.getElementById('nameDel').addEventListener('click', () => {
+  const d = document.getElementById('nameDel');
+  if(!delArm){
+    delArm = true; d.classList.add('arm'); d.textContent = 'ほんとうに けす？';
+    setTimeout(disarm, 4000);
+    return;
+  }
+  delWho();
+});
 document.getElementById('nameClose').addEventListener('click', closeName);
 document.getElementById('nameIn').addEventListener('keydown', e => {
-  if(e.key === 'Enter'){ setWho(e.target.value || who); closeName(); }
+  if(e.key === 'Enter'){
+    if(nmEdit){ renameWho(e.target.value); }
+    else { setWho(e.target.value || who); closeName(); }
+  }
   e.stopPropagation();
 });
 addEventListener('resize', fit);
