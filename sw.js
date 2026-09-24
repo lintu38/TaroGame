@@ -1,5 +1,5 @@
 /* TARO GAME — おいてある ものを ためておいて、電波が なくても 遊べるように */
-const CACHE = 'taro-game-v1';
+const CACHE = 'taro-game-v3';
 
 self.addEventListener('install', e => { self.skipWaiting(); });
 self.addEventListener('activate', e => {

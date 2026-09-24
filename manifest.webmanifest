@@ -1,7 +1,8 @@
 {
   "name": "TARO GAME",
-  "short_name": "TARO",
+  "short_name": "TARO GAME",
   "description": "おなじ大きさの子どうしがくっついて、ひとつ大きな子になるゲーム",
+  "id": "./",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
