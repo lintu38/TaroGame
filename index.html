@@ -1118,13 +1118,14 @@ function showClear(b){
   over = true;                         /* ∞ は クリアしたら そこで おしまい */
   paused = false;
   if(LIMIT === Infinity && tUsed > 0) saveFast(tUsed);
+  const rec = (LIMIT !== 180000) ? saveEnd() : false;
   const ic = document.getElementById('ovIc');
   ic.innerHTML = KINDS[b.kind].make(b.ci, BOW[b.bi], b.pi);
   const sv = ic.querySelector('svg');
   if(sv){ sv.removeAttribute('width'); sv.removeAttribute('height'); }
   document.getElementById('ovTitle').textContent = 'GAME CLEAR';
   document.getElementById('ovScore').textContent = score;
-  document.getElementById('ovNew').style.display = 'none';
+  document.getElementById('ovNew').style.display = rec && score > 0 ? '' : 'none';
   document.getElementById('again').textContent = 'もういちど';
   document.getElementById('over').classList.add('on');
 }
@@ -1226,8 +1227,13 @@ function endGame(title, bright){
   document.getElementById('ovIc').innerHTML = '';
   document.getElementById('ovTitle').textContent = title;
   document.getElementById('again').textContent = 'もういちど';
-  const rec = LIMIT === 180000 && score > best;
-  if(rec){ best = score; saveBest(); paintHud(); paintRank(); }
+  let rec = false;
+  if(LIMIT === 180000){
+    rec = score > best;
+    if(rec){ best = score; saveBest(); paintHud(); paintRank(); }
+  } else {
+    rec = saveEnd();                       /* ∞ も きろくに のこす */
+  }
   document.getElementById('ovScore').textContent = score;
   document.getElementById('ovNew').style.display = rec && score > 0 ? '' : 'none';
   document.getElementById('over').classList.add('on');
@@ -2281,6 +2287,20 @@ function bestOf(name){
   const r = recs[name];
   return r ? (r[BATTLE_LV] | 0) : 0;       /* 3分バトルの てんすう */
 }
+/* BEST SCORE は 3分バトルでも ∞ でも、いちばん高い てんすう（6 は ∞ の ぶん） */
+function anyBest(name){
+  const r = recs[name];
+  return r ? Math.max(r[BATTLE_LV] | 0, r[6] | 0) : 0;
+}
+function saveEnd(){                        /* ∞ の てんすうを のこす */
+  if(!recs[who]) recs[who] = [0, 0, 0];
+  if(score > (recs[who][6] | 0)){
+    recs[who][6] = score;
+    saveRecs(); paintRank();
+    return true;
+  }
+  return false;
+}
 /* ∞ を クリアするまでの いちばん短い時間。むずかしさごとに のこす（3,4,5） */
 function fastOf(name, l){
   const r = recs[name];
@@ -2289,7 +2309,7 @@ function fastOf(name, l){
 function topBest(){                        /* てんすうが いちばんの 人 */
   let n = null, v = 0;
   Object.keys(recs).forEach(function(k){
-    const x = bestOf(k);
+    const x = anyBest(k);
     if(x > v){ v = x; n = k; }
   });
   return n ? { name: n, v: v } : null;
