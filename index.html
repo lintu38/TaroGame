@@ -177,6 +177,7 @@
     display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
     animation:stGlow 2.1s ease-in-out infinite; }
   .startBtn .ico{ display:block; line-height:0; width:20%; max-width:32px; }
+  .startBtn .ico.xm{ width:25%; max-width:40px; }   /* サンタ帽の ぶん */
   .startBtn .ico svg{ width:100%; height:auto; display:block; }
   .startBtn b{ font-family:'Comfortaa','Zen Kaku Gothic New',cursive; font-weight:700;
     font-size:22px; letter-spacing:.1em; color:#8A6437; padding-left:.1em; }
@@ -472,7 +473,9 @@ const COATS = (function(){
     ['#C9A87C', '#E4D2B4'],   /* 4 ベージュ */
     ['#C3C0BA', '#DEDCD7'],   /* 5 薄いグレー */
     ['#D3B183', '#E9D7B8'],   /* 6 こいめの ベージュ ← いちばん大きい子 */
-    ['#E0CCAB', '#F0E6D4']    /* 7 淡いベージュ（クリアの ひとつ手前） */
+    ['#E0CCAB', '#F0E6D4'],   /* 7 淡いベージュ（クリアの ひとつ手前） */
+    ['#C4514A', '#DE8079'],   /* 8 クリスマスの あか */
+    ['#3F7A52', '#68A278']    /* 9 クリスマスの みどり */
   ];
   return TOPS.map(t => ({ coat: t[0], earIn: t[1], face: FACE, muz: MUZ }));
 })();
@@ -808,6 +811,8 @@ function newDrop(){
   let r = Math.random(), t = mix.length - 1;
   for(let i = 0; i < mix.length; i++){ if(r < mix[i]){ t = i; break; } r -= mix[i]; }
   const b = makeBall(t, aimX, LINE_Y - 34, 'dog');
+  /* クリスマスの ころは、たまに あかい子・みどりの子 */
+  if(season() === 'xmas' && Math.random() < 0.22) b.ci = Math.random() < 0.5 ? 8 : 9;
   b.px = b.x; b.py = b.y;
   return b;
 }
@@ -1150,6 +1155,7 @@ function toIdle(){
   reset();
   idle = true;
   rolls.length = 0; rollNext = 0;        /* 転がる子は 仕切りなおし */
+  bals.length = 0; balNext = 0;
   paused = true;
   showCount('');
   showCong(false);
@@ -1420,15 +1426,27 @@ function clockF(){
 }
 /* 空の すすみぐあい。∞ のときは、ほんとうの 時刻に あわせる */
 function dayF(){
-  return LIMIT === Infinity ? clockF() : Math.min(1, tUsed / LIMIT);
+  /* START の 画面は いつも 今の 時間の 空。3分バトルは はじまってから 一日が すすむ */
+  if(idle || LIMIT === Infinity) return clockF();
+  return Math.min(1, tUsed / LIMIT);
 }
-function phaseKind(ph){ return ph === 0 ? 'bird' : ph === 1 ? 'crow' : 'owl'; }
+function phaseKind(ph){
+  if(ph === 2){
+    /* 十五夜と クリスマスの 夜は フクロウは おやすみ */
+    const sn = season();
+    if(sn === 'tsukimi' || sn === 'xmas') return '';
+    return 'owl';
+  }
+  return ph === 0 ? (Math.random() < 0.5 ? 'spar' : 'bird') : 'crow';
+}
+function kindPhase(k){ return k === 'crow' ? 1 : k === 'owl' ? 2 : 0; }
 function perchY(o){ return LINE_Y - (o.kind === 'owl' ? 4.2 : 5.4 * o.sz); }
 
 function spawnSky(now, ph){
   const kind = phaseKind(ph);
+  if(!kind) return;
   const dir = Math.random() < 0.5 ? 1 : -1;
-  const sz = kind === 'owl' ? 1 : kind === 'crow' ? 1.12 : 1;
+  const sz = kind === 'owl' ? 1 : kind === 'crow' ? 1.12 : kind === 'spar' ? 0.88 : 1;
   const o = { kind: kind, sz: sz, face: dir,
               x: dir > 0 ? -28 : W + 28,
               y: 15 + Math.random() * 30,      /* 上のほうを 飛ぶ */
@@ -1552,7 +1570,7 @@ function skyTick(dt, now, ph){
     for(let i = 0; i < SKYL.length; i++){
       const o = SKYL[i];
       if(o.kind === 'ufo' || o.kind === 'hero') continue;
-      if(o.kind !== phaseKind(ph) && o.st === 'perch'){
+      if(kindPhase(o.kind) !== ph && o.st === 'perch'){
         o.until = Math.min(o.until, now + 900 + Math.random() * 1600);
       }
     }
@@ -1626,19 +1644,34 @@ function drawSunMoon(now, f, night){
   const sa = Math.max(0, Math.min(1, 1 - (night - 0.02) * 2.6));
   if(sa > 0.012){
     const warm = fs < 0.42 ? 0 : Math.min(1, (fs - 0.42) / 0.48);
-    const x = W * (0.34 + 0.54 * fs);
-    const y = 32 + 46 * Math.pow(Math.max(0, fs - 0.35) / 0.65, 2);
-    const core = mix('#FFF6CC', '#F98E52', warm);
-    const edge = mix('#FFE7A2', '#F2A45E', warm);
-    const r = 11 + warm * 2.6;
+    /* 上を 北に して、東（右）から 南（下）を まわって 西（左）へ */
+    const x = W * (0.86 - 0.72 * fs);
+    const y = 26 + 48 * Math.sin(Math.PI * Math.max(0, Math.min(1, fs)));
+    /* One Step の HOME の お日さまと おなじ 色 */
+    const c0 = mix('#FFFBEC', '#EC8B6D', warm);
+    const c1 = mix('#FDEBB4', '#E4805F', warm);
+    const c2 = mix('#F6CE72', '#E1785C', warm);
+    const c3 = mix('#EFB94C', '#DA7055', warm);
+    const glow = mix('#F6CE72', '#E1785C', warm);
+    const r = (12 + warm * 1.4) * (1 + 0.02 * Math.sin(now / 3000));
+    const rgba = (c, a) => c.replace('rgb(', 'rgba(').replace(')', ',' + a + ')');
     ctx.save();
     ctx.globalAlpha = sa;
-    const gr = ctx.createRadialGradient(x, y, r * 0.6, x, y, r * 2.9);
-    gr.addColorStop(0, edge.replace('rgb(', 'rgba(').replace(')', ',.42)'));
-    gr.addColorStop(1, edge.replace('rgb(', 'rgba(').replace(')', ',0)'));
-    ctx.fillStyle = gr;
-    ctx.beginPath(); ctx.arc(x, y, r * 2.9, 0, 6.2832); ctx.fill();
-    ctx.fillStyle = core;
+    /* まわりの ひかり */
+    const go = ctx.createRadialGradient(x, y, r * 0.9, x, y, r * (warm ? 3.0 : 3.6));
+    go.addColorStop(0, rgba(glow, 0.30));
+    go.addColorStop(0.45, rgba(glow, 0.15));
+    go.addColorStop(1, rgba(glow, 0));
+    ctx.fillStyle = go;
+    ctx.beginPath(); ctx.arc(x, y, r * 3.6, 0, 6.2832); ctx.fill();
+    /* ふちの わ */
+    ctx.strokeStyle = rgba(glow, 0.24); ctx.lineWidth = r * 0.46;
+    ctx.beginPath(); ctx.arc(x, y, r * 1.22, 0, 6.2832); ctx.stroke();
+    /* まんなかは 白く、そとに いくほど こく */
+    const gs = ctx.createRadialGradient(x, y - r * 0.12, r * 0.06, x, y, r);
+    gs.addColorStop(0, c0); gs.addColorStop(0.34, c1);
+    gs.addColorStop(0.66, c2); gs.addColorStop(1, c3);
+    ctx.fillStyle = gs;
     ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill();
     ctx.restore();
   }
@@ -1686,10 +1719,24 @@ function drawSkyOne(o, now){
     ctx.rotate(Math.sin(now / 1700) * 0.044);
     ctx.translate(0, Math.sin(now / 1700 + 1) * 1.6);
     if(uimg) ctx.drawImage(uimg, -uw / 2, -uh / 2 - 2, uw, uh);
+    const xmas = season() === 'xmas';
+    if(xmas){                                  /* まるい ところが 赤と緑に */
+      const q = 0.5 + 0.5 * Math.sin(now / 520);
+      ctx.save();
+      ctx.globalAlpha = 0.34 + 0.3 * q;
+      ctx.fillStyle = '#D6453F';
+      ctx.beginPath();
+      ctx.ellipse(0, (10.6 - 14) * us - 2, 9.2 * us, 7.2 * us, 0, 0, 6.2832); ctx.fill();
+      ctx.globalAlpha = 0.34 + 0.3 * (1 - q);
+      ctx.fillStyle = '#2F8A55';
+      ctx.beginPath();
+      ctx.ellipse(0, (10.6 - 14) * us - 2, 9.2 * us, 7.2 * us, 0, 0, 6.2832); ctx.fill();
+      ctx.restore();
+    }
     for(let i = 0; i < UFO_LAMP.length; i++){
       const a = 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(now / 200 - i * 1.1));
       ctx.globalAlpha = a;
-      ctx.fillStyle = '#F2DC85';
+      ctx.fillStyle = xmas ? (i % 2 ? '#3FA86A' : '#E2483F') : '#F2DC85';
       ctx.beginPath();
       ctx.arc((UFO_LAMP[i][0] - 24) * us, (UFO_LAMP[i][1] - 14) * us - 2, 1.5 * us, 0, 6.2832);
       ctx.fill();
@@ -1701,6 +1748,11 @@ function drawSkyOne(o, now){
     const hw = 46, hh = hw * 30 / 64;
     const himg = skyArt('hero', HERO_SVG);
     if(himg) ctx.drawImage(himg, -hw / 2, -hh / 2, hw, hh);
+    if(season() === 'xmas'){                  /* サンタの ぼうし */
+      const hs = hw / 64;
+      ctx.save(); ctx.translate((44 - 32) * hs, (12.8 - 15) * hs);
+      hatDraw(4.3 * hs); ctx.restore();
+    }
     ctx.restore(); return;
   }
 
@@ -1720,11 +1772,11 @@ function drawSkyOne(o, now){
     ctx.restore(); return;
   }
 
-  /* 小鳥 と カラス */
-  const crow = o.kind === 'crow';
-  const body = crow ? '#3C3C46' : '#8FB4CE';
-  const wing = crow ? '#2A2A33' : '#6C93B2';
-  const beak = crow ? '#5C5C66' : '#E7A85C';
+  /* 小鳥・スズメ・カラス */
+  const crow = o.kind === 'crow', spar = o.kind === 'spar';
+  const body = crow ? '#3C3C46' : spar ? '#B08A5E' : '#8FB4CE';
+  const wing = crow ? '#2A2A33' : spar ? '#8A6A46' : '#6C93B2';
+  const beak = crow ? '#5C5C66' : spar ? '#6B5A46' : '#E7A85C';
   ctx.fillStyle = body;
   ctx.beginPath();                                /* しっぽ */
   ctx.moveTo(-3.4, -0.4);
@@ -1735,6 +1787,14 @@ function drawSkyOne(o, now){
   ctx.fillStyle = beak;
   ctx.beginPath(); ctx.moveTo(6.6, -2.7); ctx.lineTo(9.6, -1.9); ctx.lineTo(6.6, -1.1);
   ctx.closePath(); ctx.fill();
+  if(spar){                                     /* スズメの ほお */
+    ctx.fillStyle = '#F4EFE3';
+    ctx.beginPath(); ctx.ellipse(4.5, -2.0, 1.5, 1.2, 0, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = '#4A3B2C';
+    ctx.beginPath(); ctx.ellipse(4.6, -1.7, 0.72, 0.6, 0, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = '#5C4632';                  /* あたまの てっぺん */
+    ctx.beginPath(); ctx.arc(4.2, -3.6, 2.2, Math.PI * 1.05, Math.PI * 2.05); ctx.fill();
+  }
   ctx.fillStyle = crow ? '#E8E2D4' : '#3A3A44';
   ctx.beginPath(); ctx.arc(5.1, -3.1, 0.62, 0, 6.2832); ctx.fill();
   ctx.save(); ctx.translate(0.4, -0.9); ctx.rotate(flap);
@@ -1742,7 +1802,7 @@ function drawSkyOne(o, now){
   ctx.beginPath(); ctx.ellipse(-1.2, 0, 4.4, 1.9, 0.1, 0, 6.2832); ctx.fill();
   ctx.restore();
   if(perch){
-    ctx.strokeStyle = crow ? '#5C5C66' : '#C9903F';
+    ctx.strokeStyle = crow ? '#5C5C66' : spar ? '#9B7B4F' : '#C9903F';
     ctx.lineWidth = 0.8; ctx.lineCap = 'round';
     ctx.beginPath(); ctx.moveTo(-0.9, 3.2); ctx.lineTo(-0.9, 5.3);
     ctx.moveTo(1.3, 3.2); ctx.lineTo(1.3, 5.3); ctx.stroke();
@@ -1752,18 +1812,35 @@ function drawSkyOne(o, now){
 
 
 /* One Step の 犬（よこ向き）。START の 画面で、赤い線の うえを かけぬける */
-function runnerSvg(a){
-  /* a: あしの ふりの 角度（-20〜20 ど） */
-  const A = a, B = -a;
-  const body = '#C9A87C', dark = '#A6845C', light = '#EBDCC4', nose = '#5C4632';
-  const la = 'transform="rotate(' + A + ' 12.5 20)"';
-  const lb = 'transform="rotate(' + B + ' 12.5 20)"';
-  const lf = 'transform="rotate(' + A + ' 21.5 20)"';
-  const lg = 'transform="rotate(' + B + ' 21.5 20)"';
+function runnerSvg(a, pose, coat){
+  /* a: あしの ふりの 角度（-20〜20 ど）。pose: ''｜sit｜lie｜sleep
+     すわる・ふせる・ねむるの かたちは One Step の 犬と おなじ */
+  const sit = pose === 'sit', lie = pose === 'lie' || pose === 'sleep';
+  const sleep = pose === 'sleep';
+  const A = (sit || lie) ? 0 : a, B = (sit || lie) ? 0 : -a;
+  /* 毛色。子犬は 黒か 茶色（One Step と おなじ 色） */
+  const C = coat === 'black' ? ['#4C4239', '#332C25', '#7A6E62']
+          : coat === 'brown' ? ['#8A6C4F', '#6E5339', '#C7AC87']
+          : ['#C9A87C', '#A6845C', '#EBDCC4'];
+  const body = C[0], dark = C[1], light = C[2], nose = '#3A2F26';
+  /* うしろあし（おしり側）と まえあし */
+  const fold = 'transform="translate(0,2) rotate(-72 ';
+  const flat = 'transform="translate(0,19.6) scale(1,0.34) translate(0,-19.6)"';
+  const la = sit ? (fold + '13 19.6)"') : lie ? flat
+           : 'transform="rotate(' + A + ' 12.5 20)"';
+  const lb = sit ? (fold + '10 19.6)"') : lie ? flat
+           : 'transform="rotate(' + B + ' 12.5 20)"';
+  const lf = sit ? '' : lie ? flat : 'transform="rotate(' + A + ' 21.5 20)"';
+  const lg = sit ? '' : lie ? flat : 'transform="rotate(' + B + ' 21.5 20)"';
+  const laFill = sit ? dark : body;          /* たたんだ あしは こい色で */
+  const hd = sleep ? ' transform="translate(0,3.4)"' : '';
+  const wrap = sit ? '<g transform="rotate(-20 24 26)">'
+             : lie ? '<g transform="translate(0,6.5)">' : '<g>';
   /* 画のこまかさは 3ばい（スマホの こうかいぞうどでも くっきり） */
   return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 34 30" width="102" height="90">'
     + '<defs><clipPath id="rHead"><circle cx="26" cy="12.5" r="5.4"/></clipPath>'
     + '<clipPath id="rNeck"><rect x="6.5" y="12" width="18" height="9" rx="4.5"/></clipPath></defs>'
+    + wrap
     + '<path fill="' + body + '" d="M7.5 14.6C4.45 12.75, 3.15 9.2, 6.0 7.1C8.3 5.5, 11.2 6.7,'
     +   ' 10.95 9.1C10.9 9.75, 10.0 9.8, 10.0 9.05C10.05 8.1, 8.45 7.95, 7.5 8.95C6.7 9.9,'
     +   ' 7.55 12.1, 10.0 13.1 Z"/>'
@@ -1774,33 +1851,48 @@ function runnerSvg(a){
     +   ' 1.4 0 0 1 21.2 20.4L21.2 23.4C22.05 23.8 22.05 25.35 21.25 25.8C20.55 26.2 19.05'
     +   ' 26.15 18.52 25.45C18.24 25.1 18.2 24.55 18.2 23.95Z"/></g>'
     + '<rect fill="' + body + '" x="6.5" y="12" width="18" height="9" rx="4.5"/>'
-    + '<g ' + la + '><path fill="' + body + '" d="M11.5 20.4A1.4 1.4 0 0 1 12.9 19L13.1 19A1.4'
+    + '<g ' + la + '><path fill="' + laFill + '" d="M11.5 20.4A1.4 1.4 0 0 1 12.9 19L13.1 19A1.4'
     +   ' 1.4 0 0 1 14.5 20.4L14.5 23.4C15.35 23.8 15.35 25.35 14.55 25.8C13.85 26.2 12.35'
     +   ' 26.15 11.82 25.45C11.54 25.1 11.5 24.55 11.5 23.95Z"/></g>'
     + '<g ' + lg + '><path fill="' + body + '" d="M20.6 20.4A1.4 1.4 0 0 1 22 19L22.2 19A1.4 1.4'
     +   ' 0 0 1 23.6 20.4L23.6 23.4C24.45 23.8 24.45 25.35 23.65 25.8C22.95 26.2 21.45 26.15'
     +   ' 20.92 25.45C20.64 25.1 20.6 24.55 20.6 23.95Z"/></g>'
+    + '<g' + hd + '>'
     + '<circle fill="' + body + '" cx="26" cy="12.5" r="5.4"/>'
     + '<g clip-path="url(#rHead)"><path fill="' + light + '" d="M33.2 11.5C32 12.4 30.6 12.85'
     +   ' 29.2 12.95C27.8 13.05 26.8 13.45 25.6 13.6C23.4 14 21 13.8 18.8 13.2L18.8 20 L33.2 20Z"/></g>'
     + '<path fill="' + dark + '" d="M23.4 8.4 C23.2 6.4, 23.95 4.9, 25.4 5.2 C26.2 6.2, 26 7.6,'
-    +   ' 25.4 9 Z"/>'
+    +   ' 25.4 9 Z"' + (sleep ? ' transform="rotate(-17 24.6 8.8)"' : '') + '/>'
     + '<ellipse fill="' + light + '" cx="27.2" cy="9.8" rx=".95" ry=".55"/>'
-    + '<circle fill="' + nose + '" cx="27" cy="11.4" r="0.95"/>'
-    + '<ellipse fill="#fff" opacity=".9" cx="26.68" cy="11.03" rx=".28" ry=".33"/>'
+    + (sleep
+       ? '<path d="M26.1 11.3 q0.95 1.05 1.9 0" fill="none" stroke="' + nose
+         + '" stroke-width=".85" stroke-linecap="round"/>'
+       : '<circle fill="' + nose + '" cx="27" cy="11.4" r="0.95"/>'
+         + '<ellipse fill="#fff" opacity=".9" cx="26.68" cy="11.03" rx=".28" ry=".33"/>')
     + '<ellipse fill="' + light + '" cx="29.75" cy="13.95" rx="2.35" ry="1.95"/>'
     + '<ellipse fill="' + nose + '" cx="31.25" cy="13.1" rx=".92" ry=".76"/>'
     + '<g clip-path="url(#rNeck)"><circle cx="26" cy="12.5" r="5.85" fill="none"'
     +   ' stroke="#9E3742" stroke-width="1.35"/></g>'
-    + '</svg>';
+    + '</g></g></svg>';
 }
 /* かけぬける 犬 */
 const RUNA = [-20, -15, -10, -5, 0, 5, 10, 15, 20];   /* あしの 角度 9まい */
 let runner = null, runNext = 0, runWarm = false;
+const RPOSE = ['sit', 'lie', 'sleep'];
 function warmRunner(){                 /* 出るまえに ぜんぶ よみこんでおく */
   if(runWarm) return;
   runWarm = true;
-  RUNA.forEach(function(a){ skyArt('run' + a, runnerSvg(a)); });
+  ['', 'black', 'brown'].forEach(function(c){
+    RUNA.forEach(function(a){ skyArt('run' + c + a, runnerSvg(a, '', c)); });
+    RPOSE.forEach(function(q){ skyArt('pose' + c + q, runnerSvg(0, q, c)); });
+  });
+}
+/* 時間で かわる ようす。朝と昼は 元気に、夕方と夜は のんびり */
+function pickPose(){
+  const ph = phaseOf(dayF()), r = Math.random();
+  if(ph === 0) return r < 0.88 ? '' : r < 0.95 ? 'sit' : 'lie';
+  if(ph === 1) return r < 0.40 ? '' : r < 0.72 ? 'sit' : 'lie';
+  return r < 0.20 ? '' : r < 0.40 ? 'sit' : r < 0.64 ? 'lie' : 'sleep';
 }
 function runTick(dt, now){
   if(idle){
@@ -1808,22 +1900,629 @@ function runTick(dt, now){
     if(!runNext) runNext = now + 1800 + Math.random() * 3000;
     else if(!runner && now > runNext){
       const dir = Math.random() < 0.5 ? 1 : -1;
-      /* 歩きと 走りの ふたつ（駆け足は なし） */
-      const gait = Math.random() < 0.45 ? 0 : 1;
+      const ph0 = phaseOf(dayF());
+      /* 朝と昼は 走る子が おおい */
+      const gait = Math.random() < (ph0 === 0 ? 0.42 : 0.72) ? 0 : 1;
       const V  = [0.55, 1.45][gait];
       const FP = [0.155, 0.30][gait];
+      const word = seasonWord();
+      const pose = pickPose();
       runner = { x: dir > 0 ? -26 : W + 26, dir: dir, gait: gait,
-                 v: dir * (V * (0.9 + Math.random() * 0.2)), fp: FP, ph: 0 };
+                 v0: dir * (V * (0.9 + Math.random() * 0.2)), fp: FP, ph: 0,
+                 say: (word && Math.random() < 0.5) ? word : '',
+                 pose: pose, st: 'walk',
+                 stopX: 52 + Math.random() * (W - 104), rest: 0,
+                 pups: Math.random() < 0.2 ? (Math.random() < 0.7 ? 1 : 2) : 0,
+                 coat: ['', ''] };        /* 子犬も 親と おなじ 毛色 */
+      runner.v = runner.v0;
       runNext = now + 6000 + Math.random() * 8000;
     }
   } else { runner = null; }
   if(runner){
     const k = Math.min(3, dt / 16.6667);
-    runner.x += runner.v * k;
-    runner.ph += runner.fp * k;
-    if(runner.x < -40 || runner.x > W + 40) runner = null;
+    const o = runner;
+    if(o.st === 'walk' && o.pose &&
+       (o.dir > 0 ? o.x >= o.stopX : o.x <= o.stopX)){
+      o.st = 'rest'; o.v = 0;            /* すこし 休む */
+      o.rest = now + 4500 + Math.random() * 7000;
+      if(o.pose === 'sleep') o.rest += 4000;
+    }
+    if(o.st === 'rest' && now > o.rest){ o.st = 'go'; o.v = o.v0; }
+    o.x += o.v * k;
+    if(o.v) o.ph += o.fp * k;
+    if(o.x < -40 || o.x > W + 40) runner = null;
   }
 }
+/* ================== 季節の かざり ================== */
+/* 新月の ときこく（Meeus のしき。中秋の名月を さがすため） */
+function newMoonMs(k){
+  const RAD = Math.PI / 180;
+  const T = k / 1236.85, T2 = T * T, T3 = T2 * T;
+  let jde = 2451550.09766 + 29.530588861 * k + 0.00015437 * T2 - 0.000000150 * T3;
+  const E  = 1 - 0.002516 * T - 0.0000074 * T2;
+  const M  = (2.5534 + 29.10535670 * k - 0.0000014 * T2) * RAD;
+  const M1 = (201.5643 + 385.81693528 * k + 0.0107582 * T2) * RAD;
+  const F  = (160.7108 + 390.67050284 * k - 0.0016118 * T2) * RAD;
+  const O  = (124.7746 - 1.56375588 * k + 0.0020672 * T2) * RAD;
+  jde += -0.40720 * Math.sin(M1) + 0.17241 * E * Math.sin(M) + 0.01608 * Math.sin(2 * M1)
+       + 0.01039 * Math.sin(2 * F) + 0.00739 * E * Math.sin(M1 - M)
+       - 0.00514 * E * Math.sin(M1 + M) + 0.00208 * E * E * Math.sin(2 * M)
+       - 0.00111 * Math.sin(M1 - 2 * F) - 0.00057 * Math.sin(M1 + 2 * F)
+       + 0.00056 * E * Math.sin(2 * M1 + M) - 0.00042 * Math.sin(3 * M1)
+       + 0.00042 * E * Math.sin(M + 2 * F) + 0.00038 * E * Math.sin(M - 2 * F)
+       - 0.00024 * E * Math.sin(2 * M1 - M) - 0.00017 * Math.sin(O)
+       - 0.00007 * Math.sin(M1 + 2 * M);
+  return (jde - 2440587.5) * 86400000;
+}
+/* 中秋の名月＝旧暦 8月15日。9/8〜10/7 に くる 新月＋14日 */
+const harvCache = {};
+function harvestMD(year){
+  if(harvCache[year]) return harvCache[year];
+  let out = null;
+  const k0 = Math.round((year - 2000) * 12.3685) + 6;
+  for(let k = k0; k < k0 + 6 && !out; k++){
+    /* 旧暦は 日本の こよみで かぞえる（＋9時間） */
+    const nm = new Date(newMoonMs(k) + 9 * 3600000);
+    const day1 = Date.UTC(nm.getUTCFullYear(), nm.getUTCMonth(), nm.getUTCDate());
+    const d15 = new Date(day1 + 14 * 86400000);
+    const m = d15.getUTCMonth() + 1, dd = d15.getUTCDate();
+    if(d15.getUTCFullYear() === year && ((m === 9 && dd >= 8) || (m === 10 && dd <= 7))){
+      out = [m, dd];
+    }
+  }
+  harvCache[year] = out || [0, 0];
+  return harvCache[year];
+}
+let seasonAt = 0, seasonV = '';
+function season(){
+  const t = Date.now();
+  if(t - seasonAt < 60000 && seasonAt) return seasonV;
+  seasonAt = t;
+  const d = new Date(t), m = d.getMonth() + 1, day = d.getDate();
+  if(m === 12 && day <= 25) seasonV = 'xmas';          /* 12/1〜25の夜まで */
+  else if(m === 1 && day <= 7) seasonV = 'newyear';    /* 松の内 */
+  else {
+    const h = harvestMD(d.getFullYear());
+    seasonV = (h[0] === m && h[1] === day) ? 'tsukimi' : '';
+  }
+  return seasonV;
+}
+function tsukimiDay(){ return season() === 'tsukimi'; }
+
+/* ---- サンタの ぼうし（One Step と おなじ かたち） ---- */
+/* One Step の 犬の 絵の なかでの 大きさ：あたまは (26,12.5) はんけい 5.4 */
+function hatDraw(r){                      /* あたまの まんなかが (0,0)、はんけい r */
+  const k = r / 5.4;
+  ctx.save();
+  ctx.scale(k, k);
+  ctx.translate(-26, -12.5);
+  ctx.fillStyle = '#C4514A';
+  ctx.beginPath();
+  ctx.moveTo(21.2, 8.4);
+  ctx.bezierCurveTo(22.2, 4.0, 25.6, 1.4, 28.6, 3.0);
+  ctx.bezierCurveTo(30.8, 4.2, 31.2, 6.5, 30.4, 8.6);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#F7F1E7';
+  ctx.beginPath();                        /* ふわっと まるく、すこしだけ 山形に */
+  ctx.moveTo(20.4, 9.0);
+  ctx.quadraticCurveTo(25.6, 7.6, 30.8, 9.0);
+  ctx.bezierCurveTo(32.0, 6.7, 28.9, 5.4, 25.6, 5.6);
+  ctx.bezierCurveTo(22.3, 5.4, 19.2, 6.7, 20.4, 9.0);
+  ctx.closePath(); ctx.fill();
+  ctx.beginPath();
+  ctx.arc(30.6, 3.6, 1.8, 0, 6.2832); ctx.fill();
+  ctx.restore();
+}
+function hatSvgPart(cx, cy, r){           /* 絵（SVG）の なかに つける ばん */
+  const k = (r / 5.4).toFixed(4);
+  return '<g transform="translate(' + cx + ' ' + cy + ') scale(' + k + ')'
+    + ' translate(-26 -12.5)">'
+    + '<path fill="#C4514A" d="M21.2 8.4c1-4.4 4.4-7 7.4-5.4 2.2 1.2 2.6 3.5 1.8 5.6z"/>'
+    + '<path fill="#F7F1E7" d="M20.4 9Q25.6 7.6 30.8 9'
+    +   'C32 6.7 28.9 5.4 25.6 5.6C22.3 5.4 19.2 6.7 20.4 9Z"/>'
+    + '<circle fill="#F7F1E7" cx="30.6" cy="3.6" r="1.8"/>'
+    + '</g>';
+}
+function withHat(svg){                    /* 犬ボールの 絵に ぼうしを のせる */
+  /* ぼうしの ぶん、上を ひろげる（きれないように、絵は すこし 下がる） */
+  return svg.replace('viewBox="0 0 ' + SVG_W + ' ' + SVG_H + '"',
+                     'viewBox="0 -16 ' + SVG_W + ' ' + (SVG_H + 16) + '"')
+            .replace('</svg>', hatSvgPart(SVG_CX, SVG_CY, SVG_R * 0.92) + '</svg>');
+}
+
+/* ---- クリスマスツリー ---- */
+function drawTree(now){
+  const bx = W * 0.20, by = LINE_Y;
+  const nt = skyAt(dayF()).night;        /* くらいほど 明るい色に */
+  ctx.save();
+  /* みき。夜は 明るめの 色にして、見えなく ならないように */
+  ctx.fillStyle = mix('#8A6A46', '#D8BC94', nt);
+  ctx.fillRect(bx - 2.8, by - 7, 5.6, 7);
+  /* は */
+  const GR = [mix('#3F6B46', '#5E9A6A', nt), mix('#4A7A4F', '#6BA877', nt),
+              mix('#568759', '#79B685', nt)];
+  for(let i = 0; i < 3; i++){
+    const base = by - 6 - i * 10.5, hw = 20 - i * 4.6, hg = 15.5;
+    ctx.fillStyle = GR[i];
+    ctx.beginPath();
+    ctx.moveTo(bx, base - hg);
+    ctx.lineTo(bx - hw, base);
+    ctx.quadraticCurveTo(bx, base + 2.2, bx + hw, base);
+    ctx.closePath(); ctx.fill();
+  }
+  const topY = by - 6 - 2 * 10.5 - 15.5;
+  /* ぴかぴか する かざり */
+  const LG = [[-11, -13, '#E8C86A'], [10, -15, '#C4514A'], [-6, -24, '#7FA6C4'],
+              [8, -27, '#E8C86A'], [-3, -35, '#C4514A'], [5, -38, '#9CC08A'],
+              [-13, -10, '#9CC08A'], [13, -11, '#7FA6C4']];
+  for(let i = 0; i < LG.length; i++){
+    const a = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(now / 380 + i * 1.7));
+    ctx.globalAlpha = a;
+    ctx.fillStyle = LG[i][2];
+    ctx.beginPath(); ctx.arc(bx + LG[i][0], by + LG[i][1], 1.7, 0, 6.2832); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  /* てっぺんの ☆ */
+  const tw = 0.72 + 0.28 * (0.5 + 0.5 * Math.sin(now / 300));
+  ctx.save();
+  ctx.translate(bx, topY - 3.4);
+  const gg = ctx.createRadialGradient(0, 0, 1, 0, 0, 11);
+  gg.addColorStop(0, 'rgba(255,236,168,' + (0.55 * tw).toFixed(2) + ')');
+  gg.addColorStop(1, 'rgba(255,236,168,0)');
+  ctx.fillStyle = gg;
+  ctx.beginPath(); ctx.arc(0, 0, 11, 0, 6.2832); ctx.fill();
+  ctx.fillStyle = '#F4CD62';
+  ctx.globalAlpha = 0.75 + 0.25 * tw;
+  ctx.beginPath();
+  for(let i = 0; i < 10; i++){
+    const rr = i % 2 ? 2.3 : 5.6, an = -Math.PI / 2 + i * Math.PI / 5;
+    const fx = Math.cos(an) * rr, fy = Math.sin(an) * rr;
+    if(i === 0) ctx.moveTo(fx, fy); else ctx.lineTo(fx, fy);
+  }
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+  ctx.restore();
+}
+
+/* ---- お正月の 門松（One Step の HOME と おなじ） ---- */
+const KADO_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 34"'
+  + ' width="60" height="102">'
+  + '<rect x="5.1" y="12" width="2.6" height="14" rx="1.3" fill="#8AA773"/>'
+  + '<rect x="8.9" y="7" width="3" height="19" rx="1.5" fill="#9BB584"/>'
+  + '<rect x="13.1" y="14" width="2.6" height="12" rx="1.3" fill="#8AA773"/>'
+  + '<ellipse cx="6.4" cy="12.2" rx="1.3" ry="0.6" fill="#D8E2CD"/>'
+  + '<ellipse cx="10.4" cy="7.2" rx="1.5" ry="0.7" fill="#E2EAD9"/>'
+  + '<ellipse cx="14.4" cy="14.2" rx="1.3" ry="0.6" fill="#D8E2CD"/>'
+  + '<rect x="4" y="22" width="12" height="12" rx="1.4" fill="#B08A5E"/>'
+  + '<path d="M4 25.5h12M4 30h12" stroke="#93714B" stroke-width="0.9"/>'
+  + '<path d="M4.2 23.4h11.6" stroke="#C4514A" stroke-width="1.8"/>'
+  + '<circle cx="7.2" cy="20" r="2.1" fill="#C4514A"/>'
+  + '<circle cx="12.6" cy="20.8" r="1.7" fill="#E8C86A"/>'
+  /* ここから にぎやかに：松・梅・水引・南天 */
+  + '<path d="M3.4 19.6q2-2.4 4.4-2.8M16.6 20.4q-2-2.4-4.4-2.6" stroke="#6E8F5C"'
+  +   ' stroke-width="1.1" fill="none" stroke-linecap="round"/>'
+  + '<path d="M2.6 21.4q2.2-1 4-0.6M17.4 22q-2.2-1-4-0.6" stroke="#7FA06A"'
+  +   ' stroke-width="0.9" fill="none" stroke-linecap="round"/>'
+  + '<g fill="#E86A7C">'
+  +   '<circle cx="4.3" cy="17.6" r="0.85"/><circle cx="5.6" cy="16.6" r="0.85"/>'
+  +   '<circle cx="6.5" cy="17.8" r="0.85"/><circle cx="5.2" cy="18.5" r="0.85"/>'
+  +   '<circle cx="4.1" cy="18.9" r="0.85"/>'
+  + '</g><circle cx="5.2" cy="17.7" r="0.62" fill="#FBEFD8"/>'
+  + '<g fill="#FBF5EA">'
+  +   '<circle cx="14.6" cy="18.4" r="0.8"/><circle cx="15.8" cy="17.5" r="0.8"/>'
+  +   '<circle cx="16.6" cy="18.7" r="0.8"/><circle cx="15.4" cy="19.3" r="0.8"/>'
+  +   '<circle cx="14.3" cy="19.6" r="0.8"/>'
+  + '</g><circle cx="15.4" cy="18.6" r="0.58" fill="#E8C86A"/>'
+  + '<path d="M4.2 24.6q5.8-2.2 11.6 0" stroke="#E8C86A" stroke-width="0.9" fill="none"/>'
+  + '<path d="M4.2 26.4q5.8-2 11.6 0" stroke="#FBF5EA" stroke-width="0.7" fill="none"/>'
+  + '<circle cx="10" cy="25.1" r="1.5" fill="#C4514A"/>'
+  + '<circle cx="10" cy="25.1" r="0.7" fill="#F3D9A6"/>'
+  + '<g fill="#C4514A"><circle cx="8.2" cy="28.6" r="0.75"/>'
+  +   '<circle cx="9.6" cy="29.2" r="0.75"/><circle cx="11" cy="28.5" r="0.75"/></g>'
+  + '</svg>';
+function drawKado(now){
+  const img = skyArt('kado', KADO_SVG);
+  if(!img) return;
+  const h = 40, w = h * 20 / 34;
+  ctx.drawImage(img, W * 0.42 - w / 2, LINE_Y - h, w, h);
+  ctx.drawImage(img, W * 0.58 - w / 2, LINE_Y - h, w, h);
+}
+/* 肉球の マーク */
+function pawMark(x, y, sz){
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = '#B08A5E';
+  ctx.beginPath();
+  ctx.ellipse(0, sz * 0.30, sz * 0.46, sz * 0.38, 0, 0, 6.2832); ctx.fill();
+  const toe = [[-0.44, -0.30, 0.20], [-0.15, -0.50, 0.20],
+               [0.17, -0.50, 0.20], [0.45, -0.28, 0.19]];
+  for(let i = 0; i < 4; i++){
+    ctx.beginPath();
+    ctx.ellipse(toe[i][0] * sz, toe[i][1] * sz, toe[i][2] * sz, toe[i][2] * sz * 1.12,
+                0, 0, 6.2832);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+/* きせつの ひとこと（ふきだしの さいごに 肉球） */
+function seasonWord(){
+  const s = season();
+  if(s === 'newyear') return 'A HAPPY NEW YEAR';
+  if(s === 'xmas' && new Date().getDate() === 25) return 'MERRY CHRISTMAS';
+  return '';
+}
+function sayBubble(x, ybase, txt){
+  ctx.save();
+  const jp = /[^\x00-\x7F]/.test(txt);
+  /* タイトルと おなじ フォント */
+  ctx.font = (jp ? '700 7px ' : '700 6.4px ')
+           + "'Comfortaa','Zen Kaku Gothic New',cursive";
+  const paw = 6.4;
+  const tw = ctx.measureText(txt).width + paw + 2.4;
+  const pw = tw + 10, ph = 12.5;
+  const px = Math.max(3, Math.min(W - pw - 3, x - pw / 2)), py = ybase - ph - 5;
+  ctx.fillStyle = 'rgba(255,253,247,.94)';
+  ctx.strokeStyle = 'rgba(168,138,99,.6)'; ctx.lineWidth = 0.8;
+  const rr = 4;
+  ctx.beginPath();
+  ctx.moveTo(px + rr, py);
+  ctx.arcTo(px + pw, py, px + pw, py + ph, rr);
+  ctx.arcTo(px + pw, py + ph, px, py + ph, rr);
+  ctx.arcTo(px, py + ph, px, py, rr);
+  ctx.arcTo(px, py, px + pw, py, rr);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x - 2.6, py + ph - 0.4);
+  ctx.lineTo(x + 2.6, py + ph - 0.4);
+  ctx.lineTo(x + 0.4, py + ph + 4);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(255,253,247,.94)'; ctx.fill();
+  ctx.fillStyle = '#6B5A46';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.fillText(txt, px + 5, py + ph / 2 + 0.4);
+  pawMark(px + pw - 5 - paw / 2, py + ph / 2 + 0.2, paw);
+  ctx.restore();
+}
+/* ---- 季節の こな：冬は 雪、春は 花びら、秋は 紅葉、夏は 花火 ---- */
+let wx = [], wxEnd = 0, wxNext = 0, fw = [], fwNext = 0;
+function wxKind(){
+  if(season() === 'tsukimi') return '';        /* 十五夜は 花火も おやすみ */
+  const m = new Date().getMonth() + 1;
+  if(m === 12 || m <= 2) return 'snow';
+  if(m <= 5) return 'sakura';
+  if(m <= 9) return 'hanabi';      /* 夏の 花火は 9月まで */
+  return 'momiji';                 /* 紅葉は 10月から 11月 */
+}
+/* One Step の HOME と おなじ 花火。
+   ひとすじ のぼって、ぱっと ひらいて、すうっと 消える */
+const FW_HUES = [50, 190, 330, 0, 275, 25, 150];
+function fwBurst(){
+  fw.push({ x: 24 + Math.random() * (W - 48), y: 20 + Math.random() * 40,
+            t: 0, life: 2400,
+            hue: FW_HUES[Math.floor(Math.random() * FW_HUES.length)],
+            rays: 14 + Math.floor(Math.random() * 3) * 2,
+            reach: 16 + Math.random() * 8,
+            climb: 26 + Math.random() * 18,
+            sway: (Math.random() - 0.5) * 9 });
+}
+/* 夜に ときどき ながれる 星（One Step と おなじ） */
+let stars2 = [], starNext = 0;
+function starAdd(){
+  const dir = Math.random() < 0.5 ? 1 : -1;
+  stars2.push({ x: dir > 0 ? -12 + Math.random() * 60 : W - 48 + Math.random() * 60,
+                y: 6 + Math.random() * 34,
+                dx: dir * (86 + Math.random() * 38), dy: 48 + Math.random() * 32,
+                dir: dir, t: 0, life: 1900, len: 34 + Math.random() * 14 });
+}
+function starStep(dt, now){
+  if(!starNext){ starNext = now + 9000 + Math.random() * 20000; }
+  else if(now > starNext && skyAt(dayF()).night > 0.32){
+    starNext = now + 75000 + Math.random() * 60000;
+    starAdd();
+    if(Math.random() < 0.3) setTimeout(starAdd, 800 + Math.random() * 700);
+  }
+  for(let i = stars2.length - 1; i >= 0; i--){
+    stars2[i].t += dt;
+    if(stars2[i].t > stars2[i].life) stars2.splice(i, 1);
+  }
+}
+function drawStars2(){
+  for(let i = 0; i < stars2.length; i++){
+    const o = stars2[i], q = o.t / o.life;
+    const a = q < 0.12 ? q / 0.12 : q > 0.7 ? Math.max(0, (1 - q) / 0.3) : 1;
+    const sc = 0.5 + q * 0.5;
+    const x = o.x + o.dx * q, y = o.y + o.dy * q;
+    const an = Math.atan2(o.dy, o.dx * o.dir) * o.dir;
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.translate(x, y);
+    ctx.rotate(an);
+    ctx.scale(o.dir * sc, sc);
+    const L = o.len;
+    const g = ctx.createLinearGradient(-L, 0, 0, 0);
+    g.addColorStop(0, 'rgba(243,217,140,0)');
+    g.addColorStop(0.65, 'rgba(240,206,106,.55)');
+    g.addColorStop(1, 'rgba(232,185,63,.95)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.rect(-L, -0.62, L, 1.24); ctx.fill();
+    ctx.fillStyle = '#F6E1A4';
+    ctx.beginPath(); ctx.arc(1.1, 0, 2.1, 0, 6.2832); ctx.fill();
+    ctx.fillStyle = '#FFF6DD';
+    ctx.beginPath(); ctx.arc(1.1, 0, 1.05, 0, 6.2832); ctx.fill();
+    ctx.restore();
+  }
+}
+function wxTick(dt, now){
+  const k = Math.min(3, dt / 16.6667);
+  const kind = wxKind();
+  if(!wxNext){ wxNext = now + 6000 + Math.random() * 10000; }
+  if(now > wxNext){
+    wxEnd = now + 15000 + Math.random() * 12000;        /* ふっている あいだ */
+    wxNext = wxEnd + 50000 + Math.random() * 70000;     /* つぎが くるまで */
+  }
+  const on = now < wxEnd;
+  starStep(dt, now);                  /* ながれ星は どの季節でも 夜に */
+  if(!kind){                          /* 十五夜など、なにも 降らない 日 */
+    if(wx.length) wx.length = 0;
+    if(fw.length) fw.length = 0;
+    return;
+  }
+  if(kind === 'hanabi'){
+    if(on && skyAt(dayF()).night > 0.22 && now > fwNext){
+      fwNext = now + 1300 + Math.random() * 2400;
+      fwBurst();
+    }
+    for(let i = fw.length - 1; i >= 0; i--){
+      fw[i].t += dt;
+      if(fw[i].t > fw[i].life) fw.splice(i, 1);
+    }
+    if(wx.length) wx.length = 0;
+    return;
+  }
+  if(fw.length) fw.length = 0;
+  const lim = kind === 'snow' ? 22 : kind === 'momiji' ? 14 : 30;
+  if(on && wx.length < lim &&
+     Math.random() < (kind === 'snow' ? 0.16 : kind === 'momiji' ? 0.12 : 0.28)){
+    const big = Math.random();
+    wx.push({ x: Math.random() * (W + 40) - 20, y: -8,
+              vy: kind === 'snow' ? 0.15 + big * 0.18 : 0.30 + big * 0.42,
+              sw: 0.5 + Math.random() * 1.2, ph: Math.random() * 6.2832,
+              r: kind === 'snow' ? 1.9 + big * 1.9
+                 : kind === 'sakura' ? 2.6 + big * 1.8 : 3.2 + big * 2.2,
+              rot: Math.random() * 6.2832, sp: (Math.random() - 0.5) * 0.06,
+              ci: Math.floor(Math.random() * 3) });
+  }
+  for(let i = wx.length - 1; i >= 0; i--){
+    const o = wx[i];
+    o.y += o.vy * k;
+    o.ph += 0.022 * k;
+    o.x += Math.sin(o.ph) * o.sw * 0.34 * k;
+    o.rot += o.sp * k;
+    if(o.y > H + 12) wx.splice(i, 1);
+  }
+}
+const SAKURA_C = ['#F8CFDC', '#F3BACB', '#FBE3EA'];
+const MOMIJI_C = ['#D4713F', '#C8563A', '#E0A13C'];
+function drawWx(now){
+  const kind = wxKind();
+  drawStars2();
+  if(!kind) return;
+  if(kind === 'hanabi'){
+    for(let i = 0; i < fw.length; i++){
+      const o = fw[i], t = o.t;
+      ctx.save();
+      if(t < 850){                       /* のぼる ひとすじ */
+        const q = t / 850, e = 1 - Math.pow(1 - q, 2.2);
+        const yy = o.y + o.climb * (1 - e), xx = o.x + o.sway * (1 - e);
+        const g = ctx.createLinearGradient(xx, yy, xx, yy + 8);
+        g.addColorStop(0, 'rgba(242,220,168,' + (q < 0.2 ? q * 4 : 0.85).toFixed(2) + ')');
+        g.addColorStop(1, 'rgba(238,214,164,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.rect(xx - 0.55, yy, 1.1, 8 * (0.5 + e * 0.5)); ctx.fill();
+      } else {                           /* ぱっと ひらく */
+        const q = Math.min(1, (t - 850) / 1500);
+        const e = 1 - Math.pow(1 - q, 3);
+        /* まんなかの ひかり */
+        if(q < 0.45){
+          ctx.globalAlpha = 0.7 * (1 - q / 0.45);
+          ctx.fillStyle = 'hsl(' + o.hue + ',95%,78%)';
+          ctx.beginPath(); ctx.arc(o.x, o.y, 2.2, 0, 6.2832); ctx.fill();
+        }
+        for(let j = 0; j < o.rays; j++){
+          const an = (6.2832 / o.rays) * j - Math.PI / 2;
+          const len = (j % 2 ? o.reach * 0.66 : o.reach) * (e * 1.06);
+          const li = j % 2 ? 72 : 60;
+          ctx.globalAlpha = q < 0.14 ? q / 0.14 * 0.78
+                          : q < 0.55 ? 0.75 : Math.max(0, 0.72 * (1 - (q - 0.55) / 0.45));
+          ctx.strokeStyle = 'hsl(' + o.hue + ',92%,' + li + '%)';
+          ctx.lineWidth = 1.2; ctx.lineCap = 'round';
+          const dp = q > 0.55 ? (q - 0.55) * 8 : 0;      /* さいごは すこし 下がる */
+          ctx.beginPath();
+          ctx.moveTo(o.x + Math.cos(an) * len * 0.22, o.y + Math.sin(an) * len * 0.22 + dp);
+          ctx.lineTo(o.x + Math.cos(an) * len, o.y + Math.sin(an) * len + dp);
+          ctx.stroke();
+          ctx.fillStyle = 'hsl(' + o.hue + ',92%,' + li + '%)';
+          ctx.beginPath();
+          ctx.arc(o.x + Math.cos(an) * len, o.y + Math.sin(an) * len + dp, 1.15, 0, 6.2832);
+          ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+    return;
+  }
+  for(let i = 0; i < wx.length; i++){
+    const o = wx[i];
+    ctx.save();
+    ctx.translate(o.x, o.y);
+    if(kind === 'snow'){
+      /* まわりが ふわっと ぼけた 雪（One Step の 庭の 雪と おなじ かんじ） */
+      const R = o.r * 1.5;
+      const g = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
+      g.addColorStop(0, 'rgba(255,255,255,.95)');
+      g.addColorStop(0.55, 'rgba(255,255,255,.88)');
+      g.addColorStop(0.78, 'rgba(255,255,255,.42)');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(0, 0, R, 0, 6.2832); ctx.fill();
+    } else if(kind === 'sakura'){
+      ctx.rotate(o.rot);
+      ctx.globalAlpha = 0.92;
+      ctx.fillStyle = SAKURA_C[o.ci];
+      ctx.beginPath();
+      ctx.moveTo(0, -o.r);
+      ctx.quadraticCurveTo(o.r * 0.9, -o.r * 0.3, o.r * 0.34, o.r * 0.9);
+      ctx.quadraticCurveTo(0, o.r * 0.55, -o.r * 0.34, o.r * 0.9);
+      ctx.quadraticCurveTo(-o.r * 0.9, -o.r * 0.3, 0, -o.r);
+      ctx.fill();
+    } else {
+      ctx.rotate(o.rot);
+      ctx.globalAlpha = 0.93;
+      ctx.fillStyle = MOMIJI_C[o.ci];
+      ctx.beginPath();
+      for(let j = 0; j < 10; j++){
+        const rr = j % 2 ? o.r * 0.56 : o.r;
+        const an = -Math.PI / 2 + j * Math.PI / 5;
+        const fx = Math.cos(an) * rr, fy = Math.sin(an) * rr * 0.92;
+        if(j === 0) ctx.moveTo(fx, fy);
+        else ctx.quadraticCurveTo(fx * 0.82, fy * 0.82, fx, fy);
+      }
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = MOMIJI_C[o.ci]; ctx.lineWidth = o.r * 0.14;
+      ctx.beginPath(); ctx.moveTo(0, o.r * 0.6); ctx.lineTo(0, o.r * 1.25); ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+function drawSeason(now){
+  const s = season();
+  if(s === 'tsukimi') drawTsukimi(now);
+  else if(s === 'xmas') drawTree(now);
+  else if(s === 'newyear') drawKado(now);
+}
+
+/* ---- 十五夜の お月見かざり ---- */
+/* One Step の うさぎ。すわって、お月さまを 見あげている */
+function rabBackSvg(){
+  const B = 'url(#rb)', D = 'url(#rd)';
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 28"'
+    + ' width="120" height="112">'
+    + '<defs>'
+    + '<radialGradient id="rb" cx="33%" cy="24%" r="88%">'
+    +   '<stop offset="0" stop-color="#FDFBF8"/><stop offset=".52" stop-color="#FDFBF7"/>'
+    +   '<stop offset="1" stop-color="#E4E2DE"/></radialGradient>'
+    + '<radialGradient id="rd" cx="33%" cy="24%" r="88%">'
+    +   '<stop offset="0" stop-color="#EBE5DD"/><stop offset=".52" stop-color="#E6DFD4"/>'
+    +   '<stop offset="1" stop-color="#C8C2B8"/></radialGradient>'
+    + '</defs>'
+    /* しっぽ */
+    + '<circle fill="' + D + '" cx="8.4" cy="24.4" r="2.7"/>'
+    /* すわった からだ（下ほど ふっくら） */
+    + '<ellipse fill="' + B + '" cx="14.2" cy="19.6" rx="6.4" ry="7.4"/>'
+    /* 地めんに ついた うしろあし */
+    + '<ellipse fill="' + D + '" cx="14.8" cy="25.7" rx="5.4" ry="1.8"/>'
+    /* まえあし */
+    + '<ellipse fill="' + B + '" cx="18.6" cy="21.6" rx="1.7" ry="3.1"/>'
+    /* あたま。お月さまの ほうへ 上むきに */
+    + '<g transform="rotate(-16 17.5 17)">'
+    +   '<ellipse fill="' + B + '" cx="18.4" cy="6.4" rx="2" ry="5"'
+    +     ' transform="rotate(-12 18.4 6.4)"/>'
+    +   '<ellipse fill="' + B + '" cx="22.2" cy="6.8" rx="2" ry="5"'
+    +     ' transform="rotate(8 22.2 6.8)"/>'
+    +   '<ellipse fill="#E4B2B8" cx="18.4" cy="6.8" rx="0.85" ry="3.1"'
+    +     ' transform="rotate(-12 18.4 6.8)"/>'
+    +   '<ellipse fill="#E4B2B8" cx="22.2" cy="7.2" rx="0.85" ry="3.1"'
+    +     ' transform="rotate(8 22.2 7.2)"/>'
+    +   '<circle fill="' + B + '" cx="20.4" cy="13.8" r="4.6"/>'
+    +   '<circle fill="#6B5F55" cx="22.4" cy="12.9" r="0.88"/>'
+    +   '<circle fill="#E4B2B8" cx="24.5" cy="14.6" r="0.88"/>'
+    + '</g>'
+    + '</svg>';
+}
+/* お月さまを 見あげて、じっと している */
+let rabs = null;
+function rabTick(now, bx){
+  if(!rabs){
+    rabs = [{ x: bx + 32, h: 16, y: 0 },
+            { x: bx + 49, h: 13, y: 0 }];
+  }
+}
+function drawRabbits(bx, by, now){
+  const img = skyArt('rabback', rabBackSvg());
+  if(!img) return;
+  rabTick(now, bx);
+  for(let i = 0; i < rabs.length; i++){
+    const o = rabs[i], h = o.h, w = h * 30 / 28;
+    ctx.drawImage(img, o.x - w / 2, by - h + 0.7 + (o.y || 0), w, h);
+  }
+}
+function drawTsukimi(now){
+  if(!tsukimiDay()) return;
+  const bx = W * 0.28, by = LINE_Y;     /* 赤い線の 左のほうに のせる */
+  ctx.save();
+  /* ススキ */
+  ctx.save();
+  ctx.translate(bx - 26, by);
+  const SK = [[-9, -34, -15], [-3, -41, -7], [3, -37, 6], [8, -30, 13]];
+  for(let i = 0; i < SK.length; i++){
+    const a = SK[i];
+    ctx.strokeStyle = '#C2A97C'; ctx.lineWidth = 1.1; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(a[0] * 0.4, a[1] * 0.6, a[0], a[1]);
+    ctx.stroke();
+    /* ほ（ふさふさ）。細い毛を たくさん */
+    ctx.save();
+    ctx.translate(a[0], a[1]);
+    ctx.rotate(a[2] * Math.PI / 180);
+    ctx.strokeStyle = '#EADCBD'; ctx.lineWidth = 0.55; ctx.globalAlpha = 0.95;
+    const HL = 13;
+    for(let j = 0; j < 13; j++){
+      const t = j / 12;
+      const y0 = 2 - t * HL;                 /* 軸の うえへ */
+      const ln = 4.6 * (1 - t * 0.55);       /* 上ほど 短く */
+      for(let sgn = -1; sgn <= 1; sgn += 2){
+        ctx.beginPath();
+        ctx.moveTo(0, y0);
+        ctx.quadraticCurveTo(sgn * ln * 0.5, y0 - ln * 0.32,
+                             sgn * ln, y0 - ln * 0.15);
+        ctx.stroke();
+      }
+    }
+    ctx.strokeStyle = '#DCCBA4'; ctx.lineWidth = 0.7;   /* ほの しん */
+    ctx.beginPath(); ctx.moveTo(0, 2); ctx.lineTo(0, 2 - HL); ctx.stroke();
+    ctx.restore();
+  }
+  ctx.restore();
+  /* 三方（さんぽう） */
+  const W1 = 21, W2 = 11, W3 = 16;
+  ctx.fillStyle = '#EBDCBE'; ctx.strokeStyle = '#C4A578'; ctx.lineWidth = 1;
+  /* だい（下） */
+  ctx.beginPath(); ctx.rect(bx - W3, by - 3.4, W3 * 2, 3.4); ctx.fill(); ctx.stroke();
+  /* あし（まんなか）、まるい くりぬき */
+  ctx.beginPath(); ctx.rect(bx - W2, by - 10, W2 * 2, 6.8); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#D6BE96';
+  ctx.beginPath(); ctx.arc(bx, by - 6.6, 2.4, 0, 6.2832); ctx.fill();
+  /* おぼん（上） */
+  ctx.fillStyle = '#F3E7CE';
+  ctx.beginPath(); ctx.rect(bx - W1, by - 14.2, W1 * 2, 4.4); ctx.fill(); ctx.stroke();
+  /* おもちの かわりの 犬ボール */
+  const img = skyArt('mochi', dogSVG(COATS[7], BOW[0], 0));
+  if(img){
+    const r = 5.4, k = r / SVG_R, w = SVG_W * k, h = SVG_H * k;
+    const pos = [[-11, -19.6], [0, -19.6], [11, -19.6],
+                 [-5.5, -29.2], [5.5, -29.2],
+                 [0, -38.6]];
+    for(let i = 0; i < pos.length; i++){
+      ctx.drawImage(img, bx + pos[i][0] - SVG_CX * k, by + pos[i][1] - SVG_CY * k, w, h);
+    }
+  }
+  /* お月さまが 出たら、うさぎが 2ひき 見あげて います */
+  /* お月さまが 顔を 出したら（夕ぐれから）うさぎも 出てくる */
+  if(skyAt(dayF()).night > 0.12) drawRabbits(bx, by, now);
+  ctx.restore();
+}
+
 /* ---- おくってもらった «フードの子» の 絵 ---- */
 const RO_LINE = '#7A4D24', RO_EYE = '#332211', RO_FACE = '#FFFFFF';
 const RO_KIND = [
@@ -1866,6 +2565,101 @@ function rollSvg(i){
     +   '" stroke-width="3.4"/>'
     + '</svg>';
 }
+/* ---- START の 画面を ふわふわ よこぎる 犬風船 ---- */
+let bals = [], balNext = 0;
+function balTick(dt, now){
+  if(!idle || cntT){
+    if(bals.length) bals.length = 0;
+    balNext = 0;
+    return;
+  }
+  const k = Math.min(3, dt / 16.6667);
+  if(!balNext){ balNext = now + 14000 + Math.random() * 14000; return; }
+  if(!bals.length && now > balNext){
+    const dir = Math.random() < 0.5 ? 1 : -1;
+    const b = makeBall(1 + Math.floor(Math.random() * 2), 0, 0, 'dog');
+    b.r = 6.5 + Math.random() * 3;
+    b.fly = true; b.born = 0; b.rot = 0;
+    b.x = dir > 0 ? -b.r - 10 : W + b.r + 10;
+    b.y0 = 26 + Math.random() * (LINE_Y - 62);
+    b.v = dir * (0.26 + Math.random() * 0.2);      /* ふわふわ ゆっくり */
+    b.ph = Math.random() * 6.2832;
+    bals.push(b);
+    balNext = now + 55000 + Math.random() * 45000;
+  }
+  for(let i = bals.length - 1; i >= 0; i--){
+    const o = bals[i];
+    o.x += o.v * k;
+    o.ph += 0.012 * k;
+    o.y = o.y0 + Math.sin(o.ph) * 4.5;
+    o.rot = Math.sin(o.ph * 0.7) * 0.10;           /* すこし ゆれる */
+    if(o.v > 0 ? o.x > W + o.r + 30 : o.x < -o.r - 30) bals.splice(i, 1);
+  }
+}
+function drawBals(now){
+  const xm = season() === 'xmas';
+  for(let i = 0; i < bals.length; i++){
+    const o = bals[i];
+    drawBall(o, 0);
+    if(xm){
+      ctx.save(); ctx.translate(o.x, o.y); ctx.rotate(o.rot || 0);
+      hatDraw(o.r * 0.92); ctx.restore();
+    }
+  }
+}
+/* ---- ちょうちょ（One Step の HOME と おなじ） ---- */
+const BF_COLORS = {
+  yellow: ['#F2D24B', '#F7DF74', '#EFC93B', '#F5D95E'],
+  blue:   ['#6FA8DC', '#8FC1E8', '#5B93C7', '#7FB4DE'],
+  white:  ['#F4F1EA', '#FFFFFF', '#E6E0D4', '#F8F5EE']
+};
+function bfSvg(kind){
+  const c = BF_COLORS[kind] || BF_COLORS.yellow;
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 18"'
+    + ' width="60" height="54">'
+    + '<ellipse cx="6" cy="7" rx="4.6" ry="5.4" fill="' + c[0] + '" opacity="0.92"/>'
+    + '<ellipse cx="14" cy="7" rx="4.6" ry="5.4" fill="' + c[1] + '" opacity="0.92"/>'
+    + '<ellipse cx="6.6" cy="12.6" rx="3.2" ry="3.6" fill="' + c[2] + '" opacity="0.88"/>'
+    + '<ellipse cx="13.4" cy="12.6" rx="3.2" ry="3.6" fill="' + c[3] + '" opacity="0.88"/>'
+    + '<rect x="9.3" y="5" width="1.4" height="9" rx="0.7" fill="#8A6C4F"/>'
+    + '</svg>';
+}
+let bfs = [], bfNext = 0;
+function bfTick(dt, now){
+  const k = Math.min(3, dt / 16.6667);
+  const day = skyAt(dayF()).night < 0.15;
+  if(!bfNext) bfNext = now + 4000 + Math.random() * 9000;
+  if(day && now > bfNext && bfs.length < 2){
+    bfNext = now + 18000 + Math.random() * 26000;
+    const dir = Math.random() < 0.5 ? 1 : -1;
+    const r = Math.random();
+    bfs.push({ x: dir > 0 ? -14 : W + 14, y: 34 + Math.random() * (LINE_Y - 44),
+               v: dir * (0.32 + Math.random() * 0.24), ph: Math.random() * 6.2832,
+               amp: 7 + Math.random() * 9, dir: dir,
+               c: r < 0.04 ? 'white' : r < 0.15 ? 'blue' : 'yellow' });
+  }
+  if(!day && bfs.length) bfs.length = 0;
+  for(let i = bfs.length - 1; i >= 0; i--){
+    const o = bfs[i];
+    o.x += o.v * k;
+    o.ph += 0.10 * k;
+    o.y += Math.sin(o.ph * 0.55) * 0.34 * k;
+    if(o.v > 0 ? o.x > W + 16 : o.x < -16) bfs.splice(i, 1);
+  }
+}
+function drawBfs(now){
+  for(let i = 0; i < bfs.length; i++){
+    const o = bfs[i];
+    const img = skyArt('bf' + o.c, bfSvg(o.c));
+    if(!img) continue;
+    const w = 11, h = w * 18 / 20;
+    ctx.save();
+    ctx.translate(o.x, o.y + Math.sin(o.ph * 0.9) * 1.6);
+    ctx.scale(o.dir * (0.45 + 0.55 * Math.abs(Math.sin(o.ph))), 1);   /* はばたき */
+    ctx.drawImage(img, -w / 2, -h / 2, w, h);
+    ctx.restore();
+  }
+}
 /* ---- 赤い線の うえを ころころ ころがる子たち ---- */
 let rolls = [], rollNext = 0;
 function rollTick(dt, now){
@@ -1903,44 +2697,14 @@ function rollTick(dt, now){
     if(o.v > 0 ? o.x > W + o.r + 40 : o.x < -o.r - 40) rolls.splice(i, 1);
   }
 }
-function drawCrown(r){                     /* 王冠は あたまの 真ん中に */
-  const w = r * 0.92, h = r * 0.5;
-  ctx.save();
-  ctx.translate(0, -r * 1.0);
-  const g = ctx.createLinearGradient(0, -h, 0, h * 0.2);
-  g.addColorStop(0, '#F7CE7E'); g.addColorStop(0.55, '#F0A45F'); g.addColorStop(1, '#EE8F63');
-  ctx.beginPath();
-  ctx.moveTo(-w / 2, h * 0.18);
-  ctx.lineTo(-w / 2, -h * 0.60);          /* ひだりの つの */
-  ctx.lineTo(-w / 4, -h * 0.18);
-  ctx.lineTo(-w / 4, -h * 0.86);          /* うちがわの つの */
-  ctx.lineTo(0, -h * 0.26);
-  ctx.lineTo(0, -h);                      /* まんなかの つの */
-  ctx.lineTo(w / 4, -h * 0.26);
-  ctx.lineTo(w / 4, -h * 0.86);
-  ctx.lineTo(w / 2, -h * 0.18);
-  ctx.lineTo(w / 2, -h * 0.60);
-  ctx.lineTo(w / 2, h * 0.18);
-  ctx.closePath();
-  ctx.fillStyle = g; ctx.fill();
-  /* つのの さきの たま */
-  const bs = r * 0.082;
-  const tips = [[-w / 2, -h * 0.60], [-w / 4, -h * 0.86], [0, -h],
-                [w / 4, -h * 0.86], [w / 2, -h * 0.60]];
-  ctx.fillStyle = '#EFBE63';
-  for(let i = 0; i < tips.length; i++){
-    ctx.beginPath(); ctx.arc(tips[i][0], tips[i][1], bs, 0, 6.2832); ctx.fill();
-  }
-  /* かざりの たま */
-  const jw = [[0, -h * 0.22, '#2E8BE8', bs * 1.15], [-w * 0.26, -h * 0.20, '#EE3D6B', bs * 0.82],
-              [w * 0.26, -h * 0.20, '#EE3D6B', bs * 0.82],
-              [-w * 0.48, -h * 0.18, '#2E8BE8', bs * 0.7],
-              [w * 0.48, -h * 0.18, '#2E8BE8', bs * 0.7]];
-  for(let i = 0; i < jw.length; i++){
-    ctx.fillStyle = jw[i][2];
-    ctx.beginPath(); ctx.arc(jw[i][0], jw[i][1], jw[i][3], 0, 6.2832); ctx.fill();
-  }
-  ctx.restore();
+/* 王冠は、おくってもらった 絵 そのまま */
+const CROWN_PNG = 'data:image/png;base64,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';
+let crownImg = null;
+function drawCrown(r){
+  if(!crownImg){ crownImg = new Image(); crownImg.src = CROWN_PNG; }
+  if(!(crownImg.complete && crownImg.naturalWidth)) return;
+  const w = r * 0.74, h = w * 52 / 62;
+  ctx.drawImage(crownImg, -w / 2, -r * 1.0 - h * 0.76, w, h);
 }
 function drawRolls(now){
   for(let i = 0; i < rolls.length; i++){
@@ -1959,25 +2723,65 @@ function drawRolls(now){
       ctx.rotate(o.rot || 0);        /* 王冠も いっしょに まわる */
       drawCrown(o.r);
       ctx.restore();
+    } else if(season() === 'xmas'){  /* サンタの ぼうし */
+      ctx.save();
+      ctx.translate(o.x, o.y);
+      ctx.rotate(o.rot || 0);
+      hatDraw(o.r * 0.68);
+      ctx.restore();
     }
   }
 }
+/* 犬を ひとり 描く（親も 子犬も おなじ） */
+function drawDog(x, ph, rest, dir, sc, gait, coat){
+  const c = coat || '';
+  let img;
+  if(rest){
+    img = skyArt('pose' + c + rest, runnerSvg(0, rest, c));
+  } else {
+    const sw = Math.sin(ph * Math.PI / 2);
+    const a = Math.round(sw * 4) * 5;
+    img = skyArt('run' + c + a, runnerSvg(a, '', c));
+  }
+  if(!img) return null;
+  const h = 30 * sc, w = 34 * sc;
+  const bob = rest ? 0 : [0.5, 0.9][gait || 0] * sc;
+  const dy = rest === 'lie' || rest === 'sleep' ? -2.4 * sc : 0;
+  ctx.save();
+  ctx.translate(x, LINE_Y - h + 4.6 * sc + dy + Math.sin(ph * Math.PI) * bob);
+  if(dir < 0){ ctx.translate(w / 2, 0); ctx.scale(-1, 1); ctx.translate(-w / 2, 0); }
+  ctx.drawImage(img, -w / 2, 0, w, h);
+  if(season() === 'xmas'){               /* サンタの ぼうし（どの かっこうでも） */
+    /* あたまの 場所は かっこうで かわる */
+    const HP = rest === 'sit' ? [4.3, 12.6, -0.349]
+             : rest === 'lie' ? [9, 19.0, 0]
+             : rest === 'sleep' ? [9, 22.4, 0]
+             : [9, 12.5, 0];
+    ctx.save();
+    ctx.translate(HP[0] * sc, HP[1] * sc);
+    if(HP[2]) ctx.rotate(HP[2]);
+    hatDraw(5.4 * sc);
+    ctx.restore();
+  }
+  ctx.restore();
+  return h;
+}
 function drawRunner(now){
   if(!runner) return;
-  /* あしの ふりは なめらかに（5どきざみ）。ph 4つで ひとまわり */
-  const sw = Math.sin(runner.ph * Math.PI / 2);
-  const a = Math.round(sw * 4) * 5;
-  let img = skyArt('run' + a, runnerSvg(a));
-  if(img) runner.img = img; else img = runner.img;   /* まだなら まえの絵で */
-  if(!img) return;
-  const h = 30, w = 34;                  /* 絵の 大きさ（そのまま） */
-  ctx.save();
-  const bob = [0.5, 0.9][runner.gait || 0];
-  /* はずみは あしに あわせて（ひと足で ひとつ） */
-  ctx.translate(runner.x, LINE_Y - h + 4.6 + Math.sin(runner.ph * Math.PI) * bob);
-  if(runner.dir < 0){ ctx.translate(w / 2, 0); ctx.scale(-1, 1); ctx.translate(-w / 2, 0); }
-  ctx.drawImage(img, -w / 2, 0, w, h);
-  ctx.restore();
+  const o = runner;
+  const rest = o.st === 'rest' ? o.pose : '';
+  /* 子犬が うしろを ついてくる */
+  for(let i = o.pups; i >= 1; i--){
+    const back = 40 + (i - 1) * 25;
+    drawDog(o.x - o.dir * back, o.ph + i * 1.3, rest ? (rest === 'sleep' ? 'lie' : rest) : '',
+            o.dir, 0.62, o.gait, o.coat[i - 1]);
+  }
+  const h = drawDog(o.x, o.ph, rest, o.dir, 1, o.gait, '');
+  if(h == null) return;
+  /* きせつの ひとこと。ときどき、まんなかあたりで（ねている ときは なし） */
+  if(o.say && rest !== 'sleep' && o.x > 58 && o.x < W - 58){
+    sayBubble(o.x, LINE_Y - h - 2, o.say);
+  }
 }
 
 /* ================== 描く ================== */
@@ -2018,6 +2822,10 @@ function draw(now){
   ctx.beginPath(); ctx.moveTo(0, LINE_Y); ctx.lineTo(W, LINE_Y); ctx.stroke();
   ctx.restore();
 
+  drawSeason(now);                    /* 季節の かざり */
+  drawWx(now);                        /* 雪・花びら・紅葉・花火 */
+  drawBfs(now);                       /* ちょうちょ */
+
   /* UFO に のぼっていく子 */
   for(let i = 0; i < LIFTS.length; i++){
     const L = LIFTS[i];
@@ -2031,6 +2839,7 @@ function draw(now){
   for(let i = 0; i < SKYL.length; i++) drawSkyOne(SKYL[i], now);
   drawRunner(now);
   drawRolls(now);
+  drawBals(now);
 
   /* 待っている子と、ねらいの すじ */
   if(!over && !idle && cur){
@@ -2111,7 +2920,11 @@ function drawBall(b, now){
     if(b.rb && now){
       /* 虹の子は、絵そのものを 虹の色に。耳も ふくめて まるごと */
       const need = w * (cv.width / W);   /* じっさいの 点の かず */
-      ctx.drawImage(rbArt(img, (now * 0.042) % 360, need), -SVG_CX * k, -SVG_CY * k, w, h);
+      /* クリスマスの ころは 赤と緑に ひかる */
+      const hue = season() === 'xmas'
+        ? 2 + 130 * (0.5 - 0.5 * Math.cos(now / 1150))   /* 赤と緑を ゆっくり 行き来 */
+        : (now * 0.042) % 360;
+      ctx.drawImage(rbArt(img, hue, need), -SVG_CX * k, -SVG_CY * k, w, h);
     } else {
       ctx.drawImage(img, -SVG_CX * k, -SVG_CY * k, w, h);
     }
@@ -2123,7 +2936,7 @@ function drawBall(b, now){
   if(b.fly){
     ctx.save();
     ctx.strokeStyle = 'rgba(120,104,86,.5)';
-    ctx.lineWidth = Math.max(0.8, b.r * 0.045);
+    ctx.lineWidth = Math.max(0.3, b.r * 0.018);      /* ひもは 細く */
     ctx.beginPath();
     ctx.moveTo(0, b.r * 0.92);
     ctx.quadraticCurveTo(b.r * 0.3, b.r * 1.5, -b.r * 0.12, b.r * 2.1);
@@ -2637,7 +3450,11 @@ function fit(){
     sb.style.width = sb.style.height = d.toFixed(0) + 'px';
     sb.querySelector('b').style.fontSize = (d * 0.168).toFixed(1) + 'px';
     const ic = sb.querySelector('.ico');      /* 犬ボールは いつも 小さく */
-    if(ic) ic.style.width = Math.round(Math.min(32, d * 0.20)) + 'px';
+    if(ic){
+      const xm = ic.classList.contains('xm');
+      ic.style.width = Math.round(xm ? Math.min(40, d * 0.25)
+                                     : Math.min(32, d * 0.20)) + 'px';
+    }
   }
   const cn = document.getElementById('count');
   if(cn){
@@ -2775,6 +3592,9 @@ function loop(now){
   skyTick(dt, now, phaseOf(dayF()));
   runTick(dt, now);
   rollTick(dt, now);
+  balTick(dt, now);
+  wxTick(dt, now);
+  bfTick(dt, now);
   if(!over && !paused && !flying){
     keyAim(dt);
     if(!window.__noTime) tUsed += dt;      /* 見なおし用に 時計を 止められる */
@@ -2839,7 +3659,12 @@ if('serviceWorker' in navigator && location.protocol.indexOf('http') === 0){
 (function(){
   const ic = document.getElementById('startIc');
   if(ic){
-    ic.innerHTML = dogSVG(COATS[TOP_COAT], BOW[0], 0);
+    if(season() === 'xmas'){
+      ic.innerHTML = withHat(dogSVG(COATS[TOP_COAT], BOW[0], 0));
+      ic.classList.add('xm');
+    } else {
+      ic.innerHTML = dogSVG(COATS[TOP_COAT], BOW[0], 0);
+    }
     const sv = ic.querySelector('svg');
     if(sv){ sv.removeAttribute('width'); sv.removeAttribute('height'); }
   }
@@ -2865,7 +3690,7 @@ window.__GAME = {
                     Math.abs(b.y - b.py) + Math.abs(b.x - b.px) >= 1.2).length,
                   balls: balls.map(b => ({ t: b.t, x: +b.x.toFixed(1),
                                            y: +b.y.toFixed(1), r: b.r })) }),
-  cur: () => cur && { t: cur.t, r: cur.r },
+  cur: () => cur && { t: cur.t, r: cur.r, ci: cur.ci },
   clears: () => clears,
   left: () => LIMIT - tUsed,
   lv: () => lv,
@@ -2901,7 +3726,25 @@ window.__GAME = {
   reset: reset,
   idle: () => idle,
   runner: () => runner && { x: +runner.x.toFixed(1), dir: runner.dir, g: runner.gait },
-  rolls: () => rolls.map(o => ({ x: +o.x.toFixed(1), r: +o.r.toFixed(1), k: !!o.crown })),
+  rolls: () => rolls.map(o => ({ x: +o.x.toFixed(1), r: +o.r.toFixed(1), k: !!o.crown,
+                                 rot: +(((o.rot % 6.2832) + 6.2832) % 6.2832).toFixed(2) })),
+  season: () => ({ s: season(), h: harvestMD(new Date().getFullYear()),
+                   wx: wxKind(), n: wx.length + fw.length,
+                   now: new Date().toString() }),
+  wxNow: () => { wxEnd = performance.now() + 30000; wxNext = wxEnd + 50000; return 1; },
+  star: () => { starAdd(); return 1; },
+  bfly: () => { bfNext = 0; return 1; },
+  setRunner: (pose, pups) => {
+    runner = { x: W * 0.45, dir: 1, gait: 0, v0: 0.55, v: pose ? 0 : 0.55,
+               fp: 0.155, ph: 0, say: '', pose: pose || '',
+               st: pose ? 'rest' : 'walk', stopX: W * 0.45,
+               rest: performance.now() + 600000, pups: pups == null ? 2 : pups,
+               coat: ['', ''] };
+    return 1;
+  },
+  rollStop: () => { rolls.forEach(o => { o.v = 0; o.rot = 0; o.x = W * 0.5; }); return rolls.length; },
+  bals: () => bals.map(o => ({ x: +o.x.toFixed(1), y: +o.y.toFixed(1), r: +o.r.toFixed(1) })),
+  bal: () => { bals.length = 0; balNext = 1; balTick(16, 1e9); return bals.length; },
   roll: (n) => { rolls.length = 0; rollNext = 1; rollTick(16, 1e9); return rolls.length; },
   pest: () => dropPest(performance.now()),
   iconSvg: () => dogSVG(COATS[TOP_COAT], BOW[0], 0),
