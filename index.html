@@ -1751,7 +1751,7 @@ function drawSkyOne(o, now){
     if(season() === 'xmas'){                  /* サンタの ぼうし */
       const hs = hw / 64;
       ctx.save(); ctx.translate((44 - 32) * hs, (12.8 - 15) * hs);
-      hatDraw(4.3 * hs); ctx.restore();
+      hatDraw(4.3 * hs, true); ctx.restore();
     }
     ctx.restore(); return;
   }
@@ -1991,10 +1991,12 @@ function tsukimiDay(){ return season() === 'tsukimi'; }
 
 /* ---- サンタの ぼうし（One Step と おなじ かたち） ---- */
 /* One Step の 犬の 絵の なかでの 大きさ：あたまは (26,12.5) はんけい 5.4 */
-function hatDraw(r){                      /* あたまの まんなかが (0,0)、はんけい r */
+function hatDraw(r, back){                /* あたまの まんなかが (0,0)、はんけい r
+                                             back: ぼんぼんを うしろ側に */
   const k = r / 5.4;
   ctx.save();
   ctx.scale(k, k);
+  if(back) ctx.scale(-1, 1);              /* あたまの 中心で 反対むきに */
   ctx.translate(-26, -12.5);
   ctx.fillStyle = '#C4514A';
   ctx.beginPath();
@@ -2200,10 +2202,10 @@ function fwBurst(){
   fw.push({ x: 24 + Math.random() * (W - 48), y: 20 + Math.random() * 40,
             t: 0, life: 2400,
             hue: FW_HUES[Math.floor(Math.random() * FW_HUES.length)],
-            rays: 14 + Math.floor(Math.random() * 3) * 2,
-            reach: 16 + Math.random() * 8,
-            climb: 26 + Math.random() * 18,
-            sway: (Math.random() - 0.5) * 9 });
+            rays: 14 + Math.floor(Math.random() * 3) * 2,   /* 14・16・18 本 */
+            reach: 14 + Math.random() * 7,                  /* One Step と おなじ */
+            climb: 58 + Math.random() * 42,
+            sway: (Math.random() - 0.5) * 18 });
 }
 /* 夜に ときどき ながれる 星（One Step と おなじ） */
 let stars2 = [], starNext = 0;
@@ -2257,7 +2259,9 @@ function wxTick(dt, now){
   const kind = wxKind();
   if(!wxNext){ wxNext = now + 6000 + Math.random() * 10000; }
   if(now > wxNext){
-    wxEnd = now + 15000 + Math.random() * 12000;        /* ふっている あいだ */
+    /* 雪は ながく しずかに、ほかは ひとしきり */
+    wxEnd = now + (kind === 'snow' ? 45000 + Math.random() * 45000
+                                   : 15000 + Math.random() * 12000);
     wxNext = wxEnd + 50000 + Math.random() * 70000;     /* つぎが くるまで */
   }
   const on = now < wxEnd;
@@ -2311,22 +2315,29 @@ function drawWx(now){
     for(let i = 0; i < fw.length; i++){
       const o = fw[i], t = o.t;
       ctx.save();
-      if(t < 850){                       /* のぼる ひとすじ */
+      if(t < 850){                       /* のぼる ひとすじ（One Step の fw-rise） */
         const q = t / 850, e = 1 - Math.pow(1 - q, 2.2);
         const yy = o.y + o.climb * (1 - e), xx = o.x + o.sway * (1 - e);
-        const g = ctx.createLinearGradient(xx, yy, xx, yy + 8);
-        g.addColorStop(0, 'rgba(242,220,168,' + (q < 0.2 ? q * 4 : 0.85).toFixed(2) + ')');
+        const hgt = 20 * (0.35 + e * 0.65);
+        const g = ctx.createLinearGradient(xx, yy, xx, yy + hgt);
+        g.addColorStop(0, 'rgba(242,220,168,' + (q < 0.18 ? q * 4.7 : 0.82).toFixed(2) + ')');
         g.addColorStop(1, 'rgba(238,214,164,0)');
         ctx.fillStyle = g;
-        ctx.beginPath(); ctx.rect(xx - 0.55, yy, 1.1, 8 * (0.5 + e * 0.5)); ctx.fill();
+        ctx.shadowColor = 'rgba(240,208,138,.6)'; ctx.shadowBlur = 4;
+        ctx.beginPath(); ctx.rect(xx - 0.75, yy, 1.5, hgt); ctx.fill();
+        ctx.shadowBlur = 0;
       } else {                           /* ぱっと ひらく */
         const q = Math.min(1, (t - 850) / 1500);
         const e = 1 - Math.pow(1 - q, 3);
         /* まんなかの ひかり */
         if(q < 0.45){
-          ctx.globalAlpha = 0.7 * (1 - q / 0.45);
+          const cq = q / 0.45;
+          const csc = cq < 0.2 ? 0.3 + cq * 3.5 : 1 - (cq - 0.2) * 0.75;
+          ctx.globalAlpha = 0.7 * (1 - cq);
           ctx.fillStyle = 'hsl(' + o.hue + ',95%,78%)';
-          ctx.beginPath(); ctx.arc(o.x, o.y, 2.2, 0, 6.2832); ctx.fill();
+          ctx.shadowColor = 'hsl(' + o.hue + ',95%,78%)'; ctx.shadowBlur = 6;
+          ctx.beginPath(); ctx.arc(o.x, o.y, 2 * csc, 0, 6.2832); ctx.fill();
+          ctx.shadowBlur = 0;
         }
         for(let j = 0; j < o.rays; j++){
           const an = (6.2832 / o.rays) * j - Math.PI / 2;
@@ -2334,17 +2345,20 @@ function drawWx(now){
           const li = j % 2 ? 72 : 60;
           ctx.globalAlpha = q < 0.14 ? q / 0.14 * 0.78
                           : q < 0.55 ? 0.75 : Math.max(0, 0.72 * (1 - (q - 0.55) / 0.45));
-          ctx.strokeStyle = 'hsl(' + o.hue + ',92%,' + li + '%)';
-          ctx.lineWidth = 1.2; ctx.lineCap = 'round';
+          const col = 'hsl(' + o.hue + ',92%,' + li + '%)';
+          ctx.strokeStyle = col;
+          ctx.lineWidth = 1.5; ctx.lineCap = 'butt';
           const dp = q > 0.55 ? (q - 0.55) * 8 : 0;      /* さいごは すこし 下がる */
           ctx.beginPath();
-          ctx.moveTo(o.x + Math.cos(an) * len * 0.22, o.y + Math.sin(an) * len * 0.22 + dp);
+          ctx.moveTo(o.x, o.y + dp);                     /* 中心から まっすぐ のびる */
           ctx.lineTo(o.x + Math.cos(an) * len, o.y + Math.sin(an) * len + dp);
           ctx.stroke();
-          ctx.fillStyle = 'hsl(' + o.hue + ',92%,' + li + '%)';
+          ctx.fillStyle = col;
+          ctx.shadowColor = col; ctx.shadowBlur = 3;
           ctx.beginPath();
-          ctx.arc(o.x + Math.cos(an) * len, o.y + Math.sin(an) * len + dp, 1.15, 0, 6.2832);
+          ctx.arc(o.x + Math.cos(an) * len, o.y + Math.sin(an) * len + dp, 1.25, 0, 6.2832);
           ctx.fill();
+          ctx.shadowBlur = 0;
         }
       }
       ctx.restore();
@@ -2760,7 +2774,7 @@ function drawDog(x, ph, rest, dir, sc, gait, coat){
     ctx.save();
     ctx.translate(HP[0] * sc, HP[1] * sc);
     if(HP[2]) ctx.rotate(HP[2]);
-    hatDraw(5.4 * sc);
+    hatDraw(5.4 * sc, true);      /* よこ顔は ぼんぼんが うしろ */
     ctx.restore();
   }
   ctx.restore();
@@ -3748,6 +3762,8 @@ window.__GAME = {
   roll: (n) => { rolls.length = 0; rollNext = 1; rollTick(16, 1e9); return rolls.length; },
   pest: () => dropPest(performance.now()),
   iconSvg: () => dogSVG(COATS[TOP_COAT], BOW[0], 0),
+  mochiSvg: () => dogSVG(COATS[7], BOW[0], 0),
+  rabSvg: () => rabBackSvg(),
   start: () => beginGame(),
   quit: () => toIdle()
 };
